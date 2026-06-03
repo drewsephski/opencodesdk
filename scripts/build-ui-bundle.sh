@@ -13,30 +13,47 @@ SHA_FILE="$DIST_DIR/squid-chat-ui-v$VERSION.tar.gz.sha256"
 echo "Building UI bundle v$VERSION..."
 echo ""
 
-# Build the Next.js app
 echo "1/3 Building Next.js app..."
 cd "$APP_DIR"
 bun run build
 
-# Prepare the tarball directory
 echo "2/3 Packaging standalone output..."
 mkdir -p "$DIST_DIR"
 
 TMP_DIR=$(mktemp -d)
 
-# The standalone output with npm workspaces is at:
-# .next/standalone/opencodesdk/  <- includes hoisted node_modules
-# .next/standalone/opencodesdk/apps/studio-chat/  <- the app itself
-STANDALONE_ROOT="$BUILD_DIR/opencodesdk"
-STANDALONE_APP="$STANDALONE_ROOT/apps/studio-chat"
+# The standalone output location varies by package manager and platform.
+# Search for server.js inside the standalone directory.
+echo "  Locating standalone output..."
+SERVER_JS=$(find "$BUILD_DIR" -name "server.js" -maxdepth 5 | head -1)
+if [ -z "$SERVER_JS" ]; then
+  echo "ERROR: Could not find server.js in $BUILD_DIR"
+  echo "  Contents of $BUILD_DIR:"
+  find "$BUILD_DIR" -maxdepth 4 -type d 2>/dev/null | head -20
+  exit 1
+fi
+echo "  Found: $SERVER_JS"
+
+# Determine the app root inside standalone output
+STANDALONE_APP_DIR="$(dirname "$SERVER_JS")"
+echo "  App root: $STANDALONE_APP_DIR"
 
 # Copy the server app files
-cp -R "$STANDALONE_APP/." "$TMP_DIR/"
+cp -R "$STANDALONE_APP_DIR/." "$TMP_DIR/"
 
-# Copy the hoisted node_modules from the workspace root level
-if [ -d "$STANDALONE_ROOT/node_modules" ]; then
+# Copy node_modules if they exist at a parent level (workspace hoisting)
+PARENT_DIR="$(dirname "$STANDALONE_APP_DIR")"
+if [ -d "$PARENT_DIR/../node_modules" ]; then
+  echo "  Copying hoisted node_modules..."
   mkdir -p "$TMP_DIR/node_modules"
-  cp -R "$STANDALONE_ROOT/node_modules/." "$TMP_DIR/node_modules/"
+  cp -R "$PARENT_DIR/../node_modules/." "$TMP_DIR/node_modules/"
+fi
+
+# Also check at BUILD_DIR level
+if [ -d "$BUILD_DIR/node_modules" ]; then
+  echo "  Copying build-level node_modules..."
+  mkdir -p "$TMP_DIR/node_modules"
+  cp -R "$BUILD_DIR/node_modules/." "$TMP_DIR/node_modules/"
 fi
 
 # Copy public assets
@@ -47,11 +64,9 @@ fi
 
 cd "$TMP_DIR"
 
-# Create tarball
 echo "3/3 Creating tarball..."
 tar -czf "$TARBALL" .
 
-# Generate checksum
 shasum -a 256 "$TARBALL" | awk '{print $1}' > "$SHA_FILE"
 
 cd "$ROOT_DIR"
