@@ -25,6 +25,8 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
 
   clearState();
 
+  const serverCwd = cwd ?? process.cwd();
+
   const manifest = new ManifestManager();
   if (!manifest.isInstalled()) {
     console.log("squid-chat is not installed. Run `squid-chat install` first.");
@@ -51,12 +53,11 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
       console.log("  Downloading OpenCode binary...");
       await ensureOpencodeBinary();
     }
-    const serverCwd = cwd ?? process.cwd();
-    process.chdir(serverCwd);
     console.log("  Starting OpenCode server...");
     opencodeServer = await createOpencodeServer({
       hostname: opencodeHost,
       port: opencodePort,
+      cwd: serverCwd,
     });
     opencodeStarted = true;
   } else {
@@ -81,14 +82,14 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   }
 
   // Auto-detect project and add to workspace list
-  const project = await detectProject(cwd);
+  const project = await detectProject(serverCwd);
   const wm = new WorkspaceManager();
   if (project) {
     console.log(`  Project detected: ${project.name} (${project.framework})`);
-    const existingWs = wm.findByPath(process.cwd());
+    const existingWs = wm.findByPath(serverCwd);
     if (!existingWs) {
       wm.add({
-        path: process.cwd(),
+        path: serverCwd,
         name: project.name,
         projectName: project.name,
         framework: project.framework,
@@ -145,7 +146,7 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
       return; // Malformed — skip
     }
 
-    if (!marker.cwd || marker.cwd === process.cwd()) return;
+    if (!marker.cwd || marker.cwd === serverCwd) return;
 
     clearInterval(restartInterval);
     console.log(`\nSwitching to workspace: ${marker.cwd}`);
