@@ -48,28 +48,10 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
   console.log(`    Downloading OpenCode ${version} (${target})...`);
   const tmpDest = `${BIN_DIR}/opencode.tar.gz`;
 
-  const res = await fetch(asset.browser_download_url, { headers: { "User-Agent": UA } });
-  if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
-  const total = parseInt(res.headers.get("content-length") ?? "0", 10);
-  const chunks: Buffer[] = [];
-  const reader = res.body!.getReader();
-  let downloaded = 0;
-  let lastProgress = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(Buffer.from(value));
-    downloaded += value.length;
-    if (total > 0) {
-      const pct = Math.round((downloaded / total) * 100);
-      const msg = `    [${pct}%] ${formatBytes(downloaded)} / ${formatBytes(total)}\r`;
-      if (msg !== lastProgress) { lastProgress = msg; process.stderr.write(msg); }
-    }
-  }
-
-  writeFileSync(tmpDest, Buffer.concat(chunks));
-  process.stderr.write("\n");
+  execSync(`curl -#fSL "${asset.browser_download_url}" -o "${tmpDest}"`, {
+    stdio: "inherit",
+    timeout: 120_000,
+  });
 
   execSync(`gunzip -c "${tmpDest}" | tar -xf - -C "${BIN_DIR}"`, { stdio: "ignore" });
   if (!existsSync(OPENCODE_BIN)) throw new Error("Extraction succeeded but opencode binary not found");
@@ -102,28 +84,10 @@ export async function ensureUIBundle(options?: DownloadOptions): Promise<string>
   console.log(`    Downloading UI bundle ${version}...`);
   const tmpDest = `${UI_DIR}/bundle.tar.gz`;
 
-  const res = await fetch(asset.browser_download_url, { headers: { "User-Agent": UA } });
-  if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
-  const total = parseInt(res.headers.get("content-length") ?? "0", 10);
-  const chunks: Buffer[] = [];
-  const reader = res.body!.getReader();
-  let downloaded = 0;
-  let lastProgress = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(Buffer.from(value));
-    downloaded += value.length;
-    if (total > 0) {
-      const pct = Math.round((downloaded / total) * 100);
-      const msg = `    [${pct}%] ${formatBytes(downloaded)} / ${formatBytes(total)}\r`;
-      if (msg !== lastProgress) { lastProgress = msg; process.stderr.write(msg); }
-    }
-  }
-
-  writeFileSync(tmpDest, Buffer.concat(chunks));
-  process.stderr.write("\n");
+  execSync(`curl -#fSL "${asset.browser_download_url}" -o "${tmpDest}"`, {
+    stdio: "inherit",
+    timeout: 120_000,
+  });
 
   if (checksumAsset) {
     const checksumRes = await fetch(checksumAsset.browser_download_url, { headers: { "User-Agent": UA } });
