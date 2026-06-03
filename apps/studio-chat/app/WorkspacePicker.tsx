@@ -89,58 +89,53 @@ function DevModeHandoff({
   workspace,
   onClose,
 }: {
-  workspace: { name: string; path: string };
+  workspace: { name: string; path: string; command?: string };
   onClose: () => void;
 }) {
-  const command = `cd ${workspace.path} && npx squid-chat`;
+  const command = workspace.command ?? `cd "${workspace.path}" && npx squid-chat`;
   const [copied, setCopied] = useState(false);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/20 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="rounded-2xl border border-edge bg-elevated shadow-2xl max-w-md w-full p-6 scale-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-semibold text-ink tracking-tight">Workspace Ready</h3>
           <button onClick={onClose} className="size-7 flex items-center justify-center rounded-lg text-ink-faint hover:text-ink hover:bg-deep transition-colors text-sm">&#10005;</button>
         </div>
 
-        <p className="text-sm text-ink-dim leading-relaxed">
-          <span className="font-medium text-ink">{workspace.name}</span> is ready at:
-        </p>
-        <code className="block mt-2 px-3 py-2 rounded-lg bg-deep border border-edge-soft text-[12px] font-mono text-ink-dim truncate select-all">
-          {workspace.path}
-        </code>
-
-        <div className="mt-4 p-3 rounded-xl bg-amber-50/60 border border-amber-200/60 dark:bg-amber-950/10 dark:border-amber-900/20">
-          <p className="text-[12px] text-amber-700 dark:text-amber-300 leading-relaxed">
-            To start chatting in this project, open your terminal and run:
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg bg-amber-100/60 dark:bg-amber-900/20 px-3 py-2 text-[12px] font-mono text-amber-800 dark:text-amber-200 select-all">
-              {command}
-            </code>
-            <button
-              onClick={() => { navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-              className="shrink-0 size-8 flex items-center justify-center rounded-lg border border-amber-200/60 dark:border-amber-800/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-all"
-              title="Copy command"
-            >
-              {copied ? (
-                <svg viewBox="0 0 24 24" fill="none" className="size-3.5"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" className="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth={1.5}/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" strokeWidth={1.5}/></svg>
-              )}
-            </button>
-          </div>
+        <div className="mb-4 px-4 py-3 rounded-xl bg-accent/5 border border-accent/15 text-center">
+          <p className="text-sm font-semibold text-ink">{workspace.name}</p>
+          <p className="text-[11px] text-ink-faint font-mono truncate mt-0.5">{workspace.path}</p>
         </div>
 
-        <p className="mt-3 text-[11px] text-ink-faint leading-relaxed">
-          The workspace is saved to your list. You can switch back anytime from this picker.
+        <p className="text-[13px] text-ink-dim mb-3">
+          To start chatting in this project, open your terminal and run:
         </p>
 
-        <div className="flex justify-end mt-4">
-          <button onClick={onClose} className="px-4 py-2 text-[13px] font-medium text-white bg-accent rounded-lg hover:brightness-110 transition-all">
-            Got it
+        <div className="flex items-center gap-2 bg-deep rounded-xl border border-edge-soft p-1">
+          <code className="flex-1 truncate px-3 py-2.5 text-[13px] font-mono text-ink select-all">
+            {command}
+          </code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            className="shrink-0 size-9 flex items-center justify-center rounded-lg bg-accent text-white hover:brightness-110 transition-all"
+            title="Copy command"
+          >
+            {copied ? (
+              <svg viewBox="0 0 24 24" fill="none" className="size-4"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" className="size-4"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth={1.5}/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" strokeWidth={1.5}/></svg>
+            )}
           </button>
         </div>
+
+        <p className="mt-3 text-[11px] text-ink-faint leading-relaxed text-center">
+          This workspace is saved to your list. You can switch back anytime.
+        </p>
+
+        <button onClick={onClose} className="mt-4 w-full py-2.5 text-[13px] font-medium text-white bg-accent rounded-xl hover:brightness-110 transition-all">
+          Got it
+        </button>
       </div>
     </div>
   );
@@ -313,7 +308,7 @@ export function WorkspacePicker({
   onClose: () => void;
   workspaces: WorkspaceEntry[];
   activeWorkspace: WorkspaceEntry | null;
-  onSwitch: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; opencodeUrl?: string; message?: string }>;
+  onSwitch: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; command?: string }>;
   onAdd: (path: string) => Promise<WorkspaceEntry>;
   onCreate: (name: string, parentDir?: string, template?: string) => Promise<WorkspaceEntry & { dirPath: string; message: string }>;
   onRemove: (id: string) => Promise<void>;
@@ -328,7 +323,7 @@ export function WorkspacePicker({
   const [addError, setAddError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [handoffWorkspace, setHandoffWorkspace] = useState<{ name: string; path: string } | null>(null);
+  const [handoffWorkspace, setHandoffWorkspace] = useState<{ name: string; path: string; command?: string } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -362,10 +357,10 @@ export function WorkspacePicker({
     setSwitchError(null);
     try {
       const result = await onSwitch(id);
-      if (result.devMode && !result.opencodeUrl) {
-        // Dev mode without a spawned server — show handoff dialog
+      if (result.devMode) {
+        // Dev mode — show handoff dialog with the terminal command
         const ws = workspaces.find((w) => w.id === id);
-        if (ws) setHandoffWorkspace({ name: ws.name, path: ws.path });
+        if (ws) setHandoffWorkspace({ name: ws.name, path: ws.path, command: result.command });
         return;
       }
       onClose();
@@ -385,9 +380,9 @@ export function WorkspacePicker({
     const ws = await onCreate(name, parentDir, template);
     // Auto-switch to the new workspace
     const switchResult = await onSwitch(ws.id);
-    if (switchResult.devMode && !switchResult.opencodeUrl) {
-      // Dev mode without a spawned server — show handoff dialog
-      setHandoffWorkspace({ name: ws.name, path: ws.dirPath || ws.path });
+    if (switchResult.devMode) {
+      // Dev mode — show handoff dialog
+      setHandoffWorkspace({ name: ws.name, path: ws.dirPath || ws.path, command: switchResult.command });
       setShowNewDialog(false);
       return;
     }

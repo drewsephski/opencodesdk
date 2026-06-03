@@ -180,7 +180,7 @@ export interface StudioChatState {
   loadWorkspaces: () => Promise<void>;
   addWorkspace: (path: string) => Promise<WorkspaceEntry>;
   createWorkspace: (name: string, parentDir?: string, template?: string) => Promise<CreateWorkspaceResult>;
-  switchWorkspace: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; opencodeUrl?: string; message?: string }>;
+  switchWorkspace: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; command?: string }>;
   removeWorkspace: (id: string) => Promise<void>;
 }
 
@@ -345,8 +345,7 @@ export function useStudioChat(): StudioChatState {
     workspacePath: string;
     workspaceName: string;
     devMode?: boolean;
-    opencodeUrl?: string;
-    message?: string;
+    command?: string;
   }
 
   const switchWorkspace = useCallback(async (id: string): Promise<SwitchResult> => {
@@ -378,20 +377,8 @@ export function useStudioChat(): StudioChatState {
       }
 
       if (data.devMode) {
-        // Running standalone (dev mode) — no CLI-managed restart happens.
-        // If the API spawned a new OpenCode server (opencodeUrl present),
-        // treat it as a successful switch and reconnect.
-        if (data.opencodeUrl) {
-          // Server was spawned for this workspace — reconnect
-          setActiveWorkspace(entry ?? null);
-          if (entry) saveToStorage(STORAGE_KEYS.activeWorkspace, entry);
-          chat.setMessages([]);
-          updateSessionId(null);
-          await loadWorkspaces();
-          return data as SwitchResult;
-        }
-        // No server spawned — return dev mode info so the UI shows the
-        // handoff dialog asking the user to run `npx squid-chat`.
+        // Dev mode — no server restart. Save the workspace selection
+        // locally and return the command so the UI shows a handoff dialog.
         chat.setMessages([]);
         updateSessionId(null);
         await loadWorkspaces();
