@@ -1,9 +1,9 @@
 import { spawn, execSync } from "child_process";
-import { existsSync, readFileSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, unlinkSync, accessSync, constants } from "fs";
 import { createServer } from "net";
 import { createOpencodeServer } from "@opencode-ai/sdk";
 import { loadConfig } from "../config.js";
-import { loadState, saveState, clearState, isProcessAlive, type RuntimeState } from "../state.js";
+import { loadState, saveState, clearState, isProcessAlive } from "../state.js";
 import { OPENCODE_BIN, UI_DIR, RESTART_MARKER_PATH } from "../paths.js";
 import { ensureOpencodeBinary } from "../download.js";
 import { healthCheck } from "../health.js";
@@ -27,6 +27,18 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
 
   const serverCwd = cwd ?? process.cwd();
 
+  // Validate serverCwd exists and is accessible
+  if (!existsSync(serverCwd)) {
+    console.error(`  Directory does not exist: ${serverCwd}`);
+    process.exit(1);
+  }
+  try {
+    accessSync(serverCwd, constants.R_OK | constants.X_OK);
+  } catch {
+    console.error(`  No read/execute permission on directory: ${serverCwd}`);
+    process.exit(1);
+  }
+
   const manifest = new ManifestManager();
   if (!manifest.isInstalled()) {
     console.log("squid-chat is not installed. Run `squid-chat install` first.");
@@ -41,25 +53,47 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   const portAvailable = await new Promise<boolean>((resolve) => {
     const server = createServer();
     server.once("error", () => resolve(false));
-    server.once("listening", () => { server.close(); resolve(true); });
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
     server.listen(opencodePort, opencodeHost);
   });
 
   let opencodeServer: { url: string; close: () => void } | null = null;
-  let opencodeStarted = false;
+  let opencodeAbortController: AbortController | undefined;
 
   if (portAvailable) {
     if (!existsSync(OPENCODE_BIN)) {
       console.log("  Downloading OpenCode binary...");
       await ensureOpencodeBinary();
+    } else {
+      // Verify binary is executable
+      try {
+        accessSync(OPENCODE_BIN, constants.X_OK);
+      } catch {
+        console.log("  OpenCode binary not executable, re-downloading...");
+        await ensureOpencodeBinary({ forceUpgrade: true });
+      }
     }
-    process.chdir(serverCwd);
+
+    // Switch to the target working directory before launching OpenCode
+    // The SDK's createOpencodeServer spawns 'opencode serve' which inherits
+    // this process's CWD, so we must chdir for it to pick up the right project
+    try {
+      process.chdir(serverCwd);
+    } catch (err) {
+      console.error(`  Failed to change to directory: ${serverCwd}`, err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+
+    opencodeAbortController = new AbortController();
+
     console.log("  Starting OpenCode server...");
     opencodeServer = await createOpencodeServer({
       hostname: opencodeHost,
       port: opencodePort,
+      signal: opencodeAbortController.signal,
     });
-    opencodeStarted = true;
   } else {
     console.log("  Using existing OpenCode server...");
   }
@@ -105,6 +139,7 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
     pid: process.pid,
     url: uiUrl,
     startedAt: Date.now(),
+    cwd: serverCwd,
     uiPort,
   });
 
@@ -119,6 +154,7 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
+    opencodeAbortController?.abort();
     opencodeServer?.close();
     serverProcess?.kill();
     clearState();

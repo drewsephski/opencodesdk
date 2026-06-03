@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { dirname } from "path";
 import { STATE_PATH, LOCK_PATH } from "./paths.js";
 
@@ -6,6 +6,7 @@ export interface RuntimeState {
   pid: number;
   url: string;
   startedAt: number;
+  cwd?: string;
   opencodePid?: number;
   uiPort?: number;
 }
@@ -27,10 +28,8 @@ export function saveState(state: RuntimeState): void {
 }
 
 export function clearState(): void {
-  try {
-    if (existsSync(STATE_PATH)) writeFileSync(STATE_PATH, "");
-    if (existsSync(LOCK_PATH)) writeFileSync(LOCK_PATH, "");
-  } catch {}
+  try { if (existsSync(STATE_PATH)) unlinkSync(STATE_PATH); } catch {}
+  try { if (existsSync(LOCK_PATH)) unlinkSync(LOCK_PATH); } catch {}
 }
 
 export function isProcessAlive(pid: number): boolean {
