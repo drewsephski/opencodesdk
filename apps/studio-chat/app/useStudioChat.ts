@@ -11,12 +11,24 @@ export interface SessionSummary {
   messageCount?: number;
 }
 
+export interface WorkspaceEntry {
+  id: string;
+  path: string;
+  name: string;
+  projectName?: string;
+  framework?: string;
+  language?: string;
+  lastOpened: number;
+  createdAt: number;
+}
+
 const STORAGE_KEYS = {
   sessionId: "squid-session-id",
   goal: "squid-goal",
   model: "squid-model",
   systemPrompt: "squid-system-prompt",
   theme: "squid-theme",
+  activeWorkspace: "squid-active-workspace",
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -133,6 +145,11 @@ function convertToUIMessages(serverMsgs: OpenCodeMessage[]): UIMessage[] {
   });
 }
 
+export interface CreateWorkspaceResult extends WorkspaceEntry {
+  dirPath: string;
+  message: string;
+}
+
 export interface StudioChatState {
   messages: UIMessage[];
   sendMessage: (text: string, extraBody?: Record<string, unknown>) => void;
@@ -155,6 +172,16 @@ export interface StudioChatState {
   setTheme: (t: "light" | "dark") => void;
   editMessage: (index: number) => string | null;
   regenerate: (index: number) => void;
+  // Workspace
+  workspaces: WorkspaceEntry[];
+  activeWorkspace: WorkspaceEntry | null;
+  isLoadingWorkspaces: boolean;
+  isReconnecting: boolean;
+  loadWorkspaces: () => Promise<void>;
+  addWorkspace: (path: string) => Promise<WorkspaceEntry>;
+  createWorkspace: (name: string, parentDir?: string, template?: string) => Promise<CreateWorkspaceResult>;
+  switchWorkspace: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; message?: string }>;
+  removeWorkspace: (id: string) => Promise<void>;
 }
 
 export function useStudioChat(): StudioChatState {
@@ -173,6 +200,14 @@ export function useStudioChat(): StudioChatState {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [initialMessages] = useState<UIMessage[]>([]);
   const initialLoadRan = useRef(false);
+
+  // Workspace state
+  const [workspaces, setWorkspaces] = useState<WorkspaceEntry[]>([]);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceEntry | null>(() =>
+    loadFromStorage<WorkspaceEntry | null>(STORAGE_KEYS.activeWorkspace, null),
+  );
 
   const goalRef = useRef(goal);
   const sessionIdRef = useRef(sessionId);
@@ -244,6 +279,165 @@ export function useStudioChat(): StudioChatState {
     saveToStorage(STORAGE_KEYS.theme, t);
   }, []);
 
+  const updateSessionId = useCallback((id: string | null) => {
+    setSessionIdState(id);
+    saveToStorage(STORAGE_KEYS.sessionId, id);
+    sessionIdRef.current = id;
+  }, []);
+
+  // Workspace functions
+  const loadWorkspaces = useCallback(async () => {
+    setIsLoadingWorkspaces(true);
+    try {
+      const res = await fetch("/api/workspace/list");
+      if (res.ok) {
+        const data: WorkspaceEntry[] = await res.json();
+        setWorkspaces(data);
+      }
+    } catch (e) {
+      console.warn("Failed to load workspaces:", e);
+    } finally {
+      setIsLoadingWorkspaces(false);
+    }
+  }, []);
+
+  const addWorkspace = useCallback(async (folderPath: string): Promise<WorkspaceEntry> => {
+    const res = await fetch("/api/workspace/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: folderPath }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error ?? "Failed to add workspace");
+    }
+    const data = await res.json();
+    setWorkspaces((prev) => {
+      const filtered = prev.filter((w) => w.id !== data.workspace.id);
+      return [data.workspace, ...filtered];
+    });
+    return data.workspace as WorkspaceEntry;
+  }, []);
+
+  const createWorkspace = useCallback(async (
+    name: string,
+    parentDir?: string,
+    template?: string,
+  ): Promise<CreateWorkspaceResult> => {
+    const res = await fetch("/api/workspace/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, parentDir, template }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error ?? "Failed to create workspace");
+    }
+    const data = await res.json();
+    setWorkspaces((prev) => {
+      const filtered = prev.filter((w) => w.id !== data.workspace.id);
+      return [data.workspace, ...filtered];
+    });
+    return { ...data.workspace, dirPath: data.dirPath, message: data.message } as CreateWorkspaceResult;
+  }, []);
+
+  interface SwitchResult {
+    workspacePath: string;
+    workspaceName: string;
+    devMode?: boolean;
+    message?: string;
+  }
+
+  const switchWorkspace = useCallback(async (id: string): Promise<SwitchResult> => {
+    try {
+      const res = await fetch("/api/workspace/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: id }),
+      });
+
+      if (res.status === 410) {
+        // Directory no longer exists — the API returns error info
+        const errData = await res.json();
+        throw errData;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error ?? "Failed to switch workspace");
+      }
+
+      const data = await res.json();
+
+      // Look up the workspace entry and persist it
+      const entry = workspaces.find((w) => w.id === id);
+      if (entry) {
+        setActiveWorkspace(entry);
+        saveToStorage(STORAGE_KEYS.activeWorkspace, entry);
+      }
+
+      if (data.devMode) {
+        // Running standalone (dev mode) — no server restart happens.
+        // Persist the selection locally and return dev mode info.
+        chat.setMessages([]);
+        updateSessionId(null);
+        await loadWorkspaces();
+        return data as SwitchResult;
+      }
+
+      setIsReconnecting(true);
+
+      // Poll health endpoint until the server is back
+      const pollHealth = async (): Promise<void> => {
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 1000));
+          try {
+            const healthRes = await fetch("/api/health");
+            if (healthRes.ok) {
+              setIsReconnecting(false);
+              // Reset chat state for the new workspace
+              chat.setMessages([]);
+              updateSessionId(null);
+              await loadWorkspaces();
+              return;
+            }
+          } catch {
+            // Server still restarting — keep polling
+          }
+        }
+        // Timeout
+        setIsReconnecting(false);
+        console.warn("Reconnection timed out after 60s");
+      };
+      pollHealth();
+      return data as SwitchResult;
+    } catch (e) {
+      setIsReconnecting(false);
+      throw e;
+    }
+  }, [workspaces, chat.setMessages, updateSessionId, loadWorkspaces]);
+
+  const removeWorkspace = useCallback(async (id: string) => {
+    // Optimistic UI removal
+    setWorkspaces((prev) => prev.filter((w) => w.id !== id));
+    if (activeWorkspace?.id === id) {
+      setActiveWorkspace(null);
+      saveToStorage(STORAGE_KEYS.activeWorkspace, null);
+    }
+    // Persist via API
+    try {
+      await fetch("/api/workspace/remove", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: id }),
+      });
+    } catch (e) {
+      console.warn("Failed to remove workspace via API:", e);
+      // Rollback on failure
+      loadWorkspaces();
+    }
+  }, [activeWorkspace, loadWorkspaces]);
+
   const fetchSessionList = useCallback(async () => {
     setIsLoadingSessions(true);
     try {
@@ -265,12 +459,6 @@ export function useStudioChat(): StudioChatState {
     } finally {
       setIsLoadingSessions(false);
     }
-  }, []);
-
-  const updateSessionId = useCallback((id: string | null) => {
-    setSessionIdState(id);
-    saveToStorage(STORAGE_KEYS.sessionId, id);
-    sessionIdRef.current = id;
   }, []);
 
   const sendMessage = useCallback(
@@ -358,6 +546,16 @@ export function useStudioChat(): StudioChatState {
       } catch (e) {
         console.warn("Failed to load session list:", e);
       }
+      // Load workspaces
+      try {
+        const res = await fetch("/api/workspace/list");
+        if (res.ok) {
+          const data: WorkspaceEntry[] = await res.json();
+          setWorkspaces(data);
+        }
+      } catch (e) {
+        console.warn("Failed to load workspace list:", e);
+      }
     })();
   }, []);
 
@@ -416,5 +614,15 @@ export function useStudioChat(): StudioChatState {
     setTheme,
     editMessage,
     regenerate,
+    // Workspace
+    workspaces,
+    activeWorkspace,
+    isLoadingWorkspaces,
+    isReconnecting,
+    loadWorkspaces,
+    addWorkspace,
+    createWorkspace,
+    switchWorkspace,
+    removeWorkspace,
   };
 }

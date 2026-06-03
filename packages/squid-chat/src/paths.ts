@@ -12,6 +12,8 @@ export const MANIFEST_PATH = join(BASE, "manifest.json");
 export const STATE_PATH = join(BASE, "run", "state.json");
 export const LOCK_PATH = join(BASE, "run", "lock");
 export const WORKSPACES_DIR = join(BASE, "workspaces");
+export const WORKSPACES_PATH = join(WORKSPACES_DIR, "workspaces.json");
+export const RESTART_MARKER_PATH = join(BASE, "run", "restart.json");
 
 export function getPlatformTarget(): string {
   const p = platform();

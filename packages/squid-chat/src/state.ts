@@ -7,6 +7,7 @@ export interface RuntimeState {
   url: string;
   startedAt: number;
   opencodePid?: number;
+  uiPort?: number;
 }
 
 export function loadState(): RuntimeState | null {
