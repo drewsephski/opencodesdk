@@ -14,17 +14,6 @@ import { WorkspaceManager } from "../workspace.js";
 export async function startCommand(cwd?: string, previousUIPort?: number): Promise<void> {
   const config = loadConfig();
 
-  const existing = loadState();
-  if (existing && isProcessAlive(existing.pid)) {
-    console.log(`\u2713 squid-chat already running at ${existing.url}`);
-    try {
-      execSync(`open "${existing.url}"`, { stdio: "ignore" });
-    } catch {}
-    return;
-  }
-
-  clearState();
-
   const serverCwd = cwd ?? process.cwd();
 
   // Validate serverCwd exists and is accessible
@@ -39,14 +28,41 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
     process.exit(1);
   }
 
+  const opencodeHost = config.opencodeHostname;
+  const opencodePort = config.opencodePort;
+
+  // Check if an existing instance is running — if so, either reuse or replace
+  const existing = loadState();
+  if (existing && isProcessAlive(existing.pid)) {
+    if (existing.cwd && existing.cwd !== serverCwd) {
+      // Existing instance is in a different directory — kill it and start fresh
+      console.log(`\nExisting squid-chat is running in a different directory:`);
+      console.log(`  Old: ${existing.cwd}`);
+      console.log(`  New: ${serverCwd}`);
+      console.log("  Stopping old instance...");
+      try {
+        process.kill(existing.pid, "SIGTERM");
+      } catch { /* already gone */ }
+      // Wait for the OpenCode port to be released before proceeding
+      await waitForPortFree(opencodePort, opencodeHost, 8000);
+    } else {
+      // Same directory (or existing.cwd missing on older state) — just reopen
+      console.log(`\u2713 squid-chat already running at ${existing.url}`);
+      try {
+        execSync(`open "${existing.url}"`, { stdio: "ignore" });
+      } catch {}
+      return;
+    }
+  }
+
+  clearState();
+
   const manifest = new ManifestManager();
   if (!manifest.isInstalled()) {
     console.log("squid-chat is not installed. Run `squid-chat install` first.");
     process.exit(1);
   }
 
-  const opencodeHost = config.opencodeHostname;
-  const opencodePort = config.opencodePort;
   const opencodeUrl = `http://${opencodeHost}:${opencodePort}`;
 
   // Check if OpenCode port is available
@@ -264,4 +280,27 @@ async function startUIServer(
   });
 
   return { port: actualPort, serverProcess: child };
+}
+
+/**
+ * Poll until a TCP port is free (not in use) or the timeout is reached.
+ * Used when replacing an old squid-chat instance — we need to wait for its
+ * OpenCode server port to be released before we can start our own.
+ */
+async function waitForPortFree(port: number, host: string, timeout: number): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const free = await new Promise<boolean>((resolve) => {
+      const server = createServer();
+      server.once("error", () => resolve(false));
+      server.once("listening", () => {
+        server.close(() => resolve(true));
+      });
+      server.listen(port, host);
+    });
+    if (free) return;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  // Timeout — log a warning and proceed anyway; the port check later will catch it
+  console.warn(`  Warning: port ${port} did not become free within ${timeout}ms, proceeding anyway`);
 }
