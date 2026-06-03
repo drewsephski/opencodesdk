@@ -16,9 +16,9 @@ export const WORKSPACES_DIR = join(BASE, "workspaces");
 export function getPlatformTarget(): string {
   const p = platform();
   const a = arch();
-  if (p === "darwin" && a === "arm64") return "aarch64-apple-darwin";
-  if (p === "darwin" && a === "x64") return "x86_64-apple-darwin";
-  if (p === "linux" && a === "x64") return "x86_64-unknown-linux-gnu";
-  if (p === "linux" && a === "arm64") return "aarch64-unknown-linux-gnu";
+  if (p === "darwin" && a === "arm64") return "mac-arm64";
+  if (p === "darwin" && a === "x64") return "mac-x86_64";
+  if (p === "linux" && a === "x64") return "linux-x86_64";
+  if (p === "linux" && a === "arm64") return "linux-arm64";
   throw new Error(`Unsupported platform: ${p} ${a}`);
 }

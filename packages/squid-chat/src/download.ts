@@ -6,7 +6,7 @@ import { dirname } from "path";
 import { BIN_DIR, OPENCODE_BIN, UI_DIR, getPlatformTarget } from "./paths.js";
 
 const OPENCODE_RELEASES = "https://api.github.com/repos/opencode-ai/opencode/releases/latest";
-const GITHUB_RELEASES = "https://api.github.com/repos/drewsepeczi/opencodesdk/releases";
+const GITHUB_RELEASES = "https://api.github.com/repos/drewsephski/opencodesdk/releases";
 
 interface DownloadOptions {
   forceUpgrade?: boolean;
@@ -65,9 +65,9 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
   const release = JSON.parse(releaseInfo.data);
   const version = (release.tag_name as string).replace(/^v/, "");
 
-  const assetName = `opencode-${target}`;
+  const archiveName = `opencode-${target}.tar.gz`;
   const asset = (release.assets as Array<{ name: string; browser_download_url: string }>)
-    .find((a) => a.name === assetName);
+    .find((a) => a.name === archiveName);
 
   if (!asset) {
     throw new Error(`No OpenCode binary found for ${target} in release ${release.tag_name}`);
@@ -75,8 +75,9 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
 
   console.log(`    Downloading OpenCode ${version} (${target})...`);
 
+  const tmpDest = `${BIN_DIR}/opencode.tar.gz`;
   let lastProgress = "";
-  await downloadFile(asset.browser_download_url, OPENCODE_BIN, {
+  await downloadFile(asset.browser_download_url, tmpDest, {
     ...options,
     onProgress: (downloaded, total) => {
       if (total > 0) {
@@ -87,6 +88,10 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
     },
   });
 
+  execSync(`tar -xzf "${tmpDest}" -C "${BIN_DIR}"`, { stdio: "ignore" });
+  if (!existsSync(OPENCODE_BIN)) {
+    throw new Error("Extraction succeeded but opencode binary not found");
+  }
   chmodSync(OPENCODE_BIN, 0o755);
   return version;
 }
