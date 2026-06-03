@@ -1,6 +1,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
+import { fileURLToPath } from "url";
 import { MANIFEST_PATH } from "./paths.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(`${__dirname}/../package.json`, "utf-8"));
 
 interface Manifest {
   installed: boolean;
@@ -15,7 +19,7 @@ const DEFAULT_MANIFEST: Manifest = {
   installed: false,
   installedAt: "",
   channel: "stable",
-  cliVersion: "0.1.0",
+  cliVersion: pkg.version,
   uiVersion: "",
   opencodeVersion: "",
 };

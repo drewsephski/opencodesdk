@@ -14,10 +14,10 @@ import {
 import { SquidChatMark } from "@/components/logo";
 
 const SUGGESTIONS = [
-  "What can you help me with?",
-  "Write a short poem about coding",
-  "Explain recursion in simple terms",
-  "Give me 5 tips for clean code",
+  "What does this directory contain?",
+  "What programming languages are used in this project?",
+  "What are the main components of this project?",
+  "Give me 5 tips for improving this codebase",
 ];
 
 function PersonIcon({ size = 20 }: { size?: number }) {
