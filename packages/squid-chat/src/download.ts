@@ -72,7 +72,7 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
   };
   await pump();
 
-  execSync(`tar -xzf "${tmpDest}" -C "${BIN_DIR}"`, { stdio: "ignore" });
+  execSync(`gunzip -c "${tmpDest}" | tar -xf - -C "${BIN_DIR}"`, { stdio: "ignore" });
   if (!existsSync(OPENCODE_BIN)) throw new Error("Extraction succeeded but opencode binary not found");
   chmodSync(OPENCODE_BIN, 0o755);
   return version;
@@ -139,7 +139,7 @@ export async function ensureUIBundle(options?: DownloadOptions): Promise<string>
     console.log("    \u2713 Checksum verified");
   }
 
-  execSync(`tar -xzf "${tmpDest}" -C "${UI_DIR}"`, { stdio: "ignore" });
+  execSync(`gunzip -c "${tmpDest}" | tar -xf - -C "${UI_DIR}"`, { stdio: "ignore" });
   writeFileSync(`${UI_DIR}/version.json`, JSON.stringify({ version }));
   return version;
 }
