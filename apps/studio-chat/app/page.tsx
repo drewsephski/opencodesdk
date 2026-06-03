@@ -1050,57 +1050,59 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-dvh w-full bg-surface relative">
       <header className="border-b border-edge/60 bg-elevated/70 backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center size-10 rounded-xl bg-accent/10 text-accent shrink-0">
-            <SquidChatMark size={24} />
+        <div className="flex items-center gap-4">
+          <div className="relative flex items-center justify-center size-12 rounded-2xl bg-accent/10 text-accent shrink-0 ring-1 ring-accent/20">
+            <SquidChatMark size={28} />
           </div>
-          <WorkspaceSwitcher
-            onOpenPicker={() => setShowWorkspacePicker(true)}
-          />
-            <div className="hidden sm:flex items-center gap-3 text-[10px] text-ink-faint font-mono tracking-wide uppercase">
-              <span className="flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-accent" />
+          <div className="flex items-center gap-2.5">
+            <WorkspaceSwitcher
+              onOpenPicker={() => setShowWorkspacePicker(true)}
+            />
+            <div className="hidden sm:flex items-center gap-3 text-[11px] text-ink-faint font-mono tracking-wide uppercase">
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-deep/60">
+                <span className="size-2 rounded-full bg-accent" />
                 {model.split("/").pop() || "big-pickle"}
               </span>
               <MCPStatus />
               {isStreaming && (
-                <span className="flex items-center gap-1 text-accent">
-                  <span className="size-1 rounded-full bg-accent animate-pulse" />
+                <span className="flex items-center gap-1.5 text-accent px-2 py-1 rounded-md bg-accent/8">
+                  <span className="size-1.5 rounded-full bg-accent animate-pulse" />
                   generating
                 </span>
               )}
               {streamTimedOut && !isStreaming && (
-                <span className="flex items-center gap-1 text-red-500">
-                  <span className="size-1 rounded-full bg-red-500" />
+                <span className="flex items-center gap-1.5 text-red-500 px-2 py-1 rounded-md bg-red-50/30 dark:bg-red-950/20">
+                  <span className="size-1.5 rounded-full bg-red-500" />
                   timeout
                 </span>
               )}
             </div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {goal && (
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-ink-dim font-mono px-2.5 py-1 rounded-md bg-accent/8 border border-accent/15 max-w-[180px] truncate" title={goal}>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-ink-dim font-mono px-3 py-1.5 rounded-lg bg-accent/8 border border-accent/15 max-w-[200px] truncate" title={goal}>
               <span>◎</span>
               <span className="truncate">{goal}</span>
             </span>
           )}
           <button
             onClick={() => setShowSidebar(true)}
-            className="hidden sm:flex items-center gap-1.5 text-[11px] text-ink-faint font-mono px-2.5 py-1 rounded-md bg-deep border border-edge-soft hover:text-ink hover:border-edge transition-all"
+            className="hidden sm:flex items-center gap-1.5 text-[12px] text-ink-faint font-mono px-3 py-1.5 rounded-lg bg-deep border border-edge-soft hover:text-ink hover:border-edge transition-all"
             title="Session History"
           >
             <SidebarIcon />
-            {sessionList.length > 0 && <span>{sessionList.length}</span>}
+            {sessionList.length > 0 && <span className="text-accent font-semibold">{sessionList.length}</span>}
           </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="hidden sm:flex items-center gap-1.5 text-[11px] text-ink-faint font-mono px-2.5 py-1 rounded-md bg-deep border border-edge-soft hover:text-ink hover:border-edge transition-all"
+            className="hidden sm:flex items-center gap-1.5 text-[12px] text-ink-faint font-mono px-3 py-1.5 rounded-lg bg-deep border border-edge-soft hover:text-ink hover:border-edge transition-all"
             title="Settings"
           >
             <ModelSelectIcon />
           </button>
           {messages.length > 0 && !isStreaming && (
-            <span className="hidden sm:inline-flex items-center text-[11px] text-ink-faint font-mono px-2.5 py-1 rounded-md bg-deep border border-edge-soft">
+            <span className="hidden sm:inline-flex items-center text-[12px] text-ink-faint font-mono px-3 py-1.5 rounded-lg bg-deep border border-edge-soft">
               {messages.length} message{messages.length !== 1 ? "s" : ""}
             </span>
           )}
