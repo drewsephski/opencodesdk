@@ -745,13 +745,8 @@ export default function Chat() {
     editMessage,
     regenerate,
     workspaces,
-    activeWorkspace,
-    isLoadingWorkspaces,
-    isReconnecting,
     loadWorkspaces,
     addWorkspace,
-    createWorkspace,
-    switchWorkspace,
     removeWorkspace,
   } = useStudioChat();
 
@@ -1060,8 +1055,6 @@ export default function Chat() {
             <SquidChatMark size={24} />
           </div>
           <WorkspaceSwitcher
-            activeWorkspace={activeWorkspace}
-            isReconnecting={isReconnecting}
             onOpenPicker={() => setShowWorkspacePicker(true)}
           />
             <div className="hidden sm:flex items-center gap-3 text-[10px] text-ink-faint font-mono tracking-wide uppercase">
@@ -1138,27 +1131,7 @@ export default function Chat() {
           </div>
         )}
 
-        {messages.length === 0 && !activeWorkspace ? (
-          <div className="relative flex flex-col items-center justify-center min-h-full px-4 py-8">
-            <div className="flex flex-col items-center text-center">
-              <div className="relative flex items-center justify-center size-28 rounded-2xl bg-accent/8 mb-6 animate-[pulse-glow_4s_ease-in-out_infinite]">
-                <SquidChatMark size={56} />
-              </div>
-              <h2 className="text-xl font-semibold text-ink tracking-tight text-balance">
-                Select a workspace to begin
-              </h2>
-              <p className="text-sm text-ink-dim mt-1.5 max-w-sm text-balance leading-relaxed">
-                Open a project folder to start chatting with AI about your code.
-              </p>
-              <button
-                onClick={() => setShowWorkspacePicker(true)}
-                className="mt-6 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-accent hover:brightness-110 transition-all"
-              >
-                Open Workspace Picker
-              </button>
-            </div>
-          </div>
-        ) : messages.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="relative flex flex-col items-center justify-center min-h-full px-4 py-8">
             <div className="flex flex-col items-center text-center">
               <div className="relative flex items-center justify-center size-28 rounded-2xl bg-accent/8 mb-6 animate-[pulse-glow_4s_ease-in-out_infinite]">
@@ -1406,28 +1379,12 @@ export default function Chat() {
 
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
 
-      {isReconnecting && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4">
-            <div className="size-10 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-            <div className="text-center">
-              <p className="text-sm font-semibold text-ink">Reconnecting…</p>
-              <p className="text-[12px] text-ink-faint mt-1">The server is restarting with the new workspace.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <WorkspacePicker
         open={showWorkspacePicker}
         onClose={() => setShowWorkspacePicker(false)}
         workspaces={workspaces}
-        activeWorkspace={activeWorkspace}
-        onSwitch={switchWorkspace}
         onAdd={addWorkspace}
-        onCreate={createWorkspace}
         onRemove={removeWorkspace}
-        hasMessages={messages.length > 0}
       />
     </div>
   );
