@@ -1,6 +1,6 @@
 {
   "name": "squid-chat",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "A beautiful chat UI for OpenCode SDK — run locally in any project",
   "license": "MIT",
   "type": "module",
@@ -24,9 +24,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/drewsepeczi/opencodesdk"
+    "url": "https://github.com/drewsephski/opencodesdk"
   },
-  "homepage": "https://github.com/drewsepeczi/opencodesdk",
+  "homepage": "https://github.com/drewsephski/opencodesdk",
   "publishConfig": {
     "access": "public"
   }
