@@ -1,5 +1,10 @@
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
-import { opencode } from "ai-sdk-provider-opencode-sdk";
+import { createOpencode } from "ai-sdk-provider-opencode-sdk";
+
+const opencode = createOpencode({
+  baseUrl: process.env.OPENCODE_SERVER_URL ?? "http://127.0.0.1:4096",
+  autoStartServer: false,
+});
 
 export const maxDuration = 60;
 
