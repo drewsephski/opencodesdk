@@ -44,6 +44,19 @@ TMP_DIR=$(mktemp -d)
 
 cp -R "$STANDALONE_APP_DIR/." "$TMP_DIR/"
 
+# Copy static assets from the build's .next/static directory
+STATIC_SRC="$BUILD_DIR/app/.next/static"
+if [ -d "$STATIC_SRC" ]; then
+  echo "  Copying static assets..."
+  mkdir -p "$TMP_DIR/.next/static"
+  cp -R "$STATIC_SRC/." "$TMP_DIR/.next/static/"
+fi
+
+# Copy BUILD_ID if not already in standalone
+if [ ! -f "$TMP_DIR/.next/BUILD_ID" ] && [ -f "$BUILD_DIR/app/.next/BUILD_ID" ]; then
+  cp "$BUILD_DIR/app/.next/BUILD_ID" "$TMP_DIR/.next/BUILD_ID"
+fi
+
 # Copy node_modules (npm produces flat, non-symlinked structures)
 PARENT_DIR="$(dirname "$STANDALONE_APP_DIR")"
 if [ -d "$PARENT_DIR/../node_modules" ]; then

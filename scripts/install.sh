@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="drewsepeczi/opencodesdk"
+REPO="drewsephski/opencodesdk"
 INSTALL_DIR="${HOME}/.local/bin"
 VERSION="${1:-latest}"
 
