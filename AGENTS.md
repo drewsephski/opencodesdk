@@ -21,11 +21,3 @@ When you need current information, best practices, real-world examples, or anyth
 
 Prefer these tools over assumptions — the frameworks here may differ from your training data.
 <!-- END:tool-use-instructions -->
-
-<!-- BEGIN:svg-logo-designer -->
-# SVG Logo Designer (rknall/svg-logo-designer)
-
-When the user asks to create a logo, brand identity, icon, or visual mark, use the `svg-logo-designer` skill from `.agents/skills/svg-logo-designer/SKILL.md`.
-
-Workflow: requirements gathering → concept development (3-5 concepts) → layout variations (horizontal, vertical, icon-only, etc.) → SVG generation with clean/semantic code → presentation with usage guidelines.
-<!-- END:svg-logo-designer -->

@@ -38,7 +38,7 @@
     },
     "packages/squid-chat": {
       "name": "squid-chat",
-      "version": "0.1.0",
+      "version": "0.1.5",
       "bin": {
         "squid-chat": "./dist/cli.js",
       },
