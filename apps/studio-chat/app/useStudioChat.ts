@@ -184,6 +184,9 @@ export function useStudioChat(): StudioChatState {
   useEffect(() => { modelRef.current = model; }, [model]);
   useEffect(() => { systemPromptRef.current = systemPrompt; }, [systemPrompt]);
 
+  // Track last seen sessionId across renders without triggering re-renders
+  const lastSeenSessionIdRef = useRef<string | null>(null);
+
   const transport = useMemo(
     // eslint-disable-next-line react-hooks/refs -- safe: refs accessed only at call time
     () => new DefaultChatTransport({
@@ -198,6 +201,20 @@ export function useStudioChat(): StudioChatState {
             systemPrompt: systemPromptRef.current || undefined,
           },
         };
+      },
+      // Intercept fetch to extract X-Session-Id from response headers.
+      // When a new session is created on the server, the new sessionId
+      // is sent back here and persisted to localStorage so subsequent
+      // messages resume the same session.
+      fetch: async (url, options) => {
+        const response = await fetch(url, options);
+        const headerSessionId = response.headers.get("X-Session-Id");
+        if (headerSessionId && headerSessionId !== lastSeenSessionIdRef.current) {
+          lastSeenSessionIdRef.current = headerSessionId;
+          sessionIdRef.current = headerSessionId;
+          saveToStorage(STORAGE_KEYS.sessionId, headerSessionId);
+        }
+        return response;
       },
     }),
     [],
@@ -240,9 +257,11 @@ export function useStudioChat(): StudioChatState {
             created: s.created,
           })),
         );
+      } else {
+        console.warn("Failed to fetch session list:", res.status);
       }
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn("Failed to fetch session list:", e);
     } finally {
       setIsLoadingSessions(false);
     }
@@ -269,18 +288,21 @@ export function useStudioChat(): StudioChatState {
 
   const deleteSession = useCallback(async (id: string) => {
     try {
-      await fetch("/api/sessions", {
+      const res = await fetch("/api/sessions", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionID: id }),
       });
+      if (!res.ok) {
+        console.warn("Failed to delete session:", id, res.status);
+      }
       setSessionList((prev) => prev.filter((s) => s.id !== id));
       if (sessionIdRef.current === id) {
         updateSessionId(null);
         chat.setMessages([]);
       }
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn("Failed to delete session:", id, e);
     }
   }, [chat.setMessages, updateSessionId]);
 
@@ -288,13 +310,16 @@ export function useStudioChat(): StudioChatState {
     async (id: string) => {
       try {
         const res = await fetch(`/api/sessions/${id}/messages`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.warn("Failed to resume session:", id, res.status);
+          return;
+        }
         const data: OpenCodeMessage[] = await res.json();
         const uiMessages = convertToUIMessages(data);
         updateSessionId(id);
         chat.setMessages(uiMessages);
-      } catch {
-        // silent
+      } catch (e) {
+        console.warn("Failed to resume session:", id, e);
       }
     },
     [chat.setMessages, updateSessionId],
@@ -311,8 +336,12 @@ export function useStudioChat(): StudioChatState {
             const data: OpenCodeMessage[] = await res.json();
             const uiMessages = convertToUIMessages(data);
             chat.setMessages(uiMessages);
+          } else {
+            console.warn("Failed to load session messages, starting fresh:", sessionId);
           }
-        } catch {}
+        } catch (e) {
+          console.warn("Failed to load session messages, starting fresh:", e);
+        }
       }
       try {
         const res = await fetch("/api/sessions?limit=50");
@@ -326,7 +355,9 @@ export function useStudioChat(): StudioChatState {
             })),
           );
         }
-      } catch {}
+      } catch (e) {
+        console.warn("Failed to load session list:", e);
+      }
     })();
   }, []);
 

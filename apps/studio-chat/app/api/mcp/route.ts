@@ -10,9 +10,8 @@ export async function GET() {
     }
     return NextResponse.json(result.data ?? {});
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("MCP status API exception:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

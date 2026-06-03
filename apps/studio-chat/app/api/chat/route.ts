@@ -1,12 +1,9 @@
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
-import { createOpencode } from "ai-sdk-provider-opencode-sdk";
+import { opencode } from "ai-sdk-provider-opencode-sdk";
+import { getOpencodeClient } from "../../lib/opencode-client";
 
-const opencode = createOpencode({
-  baseUrl: process.env.OPENCODE_SERVER_URL ?? "http://127.0.0.1:4096",
-  autoStartServer: false,
-});
-
-export const maxDuration = 60;
+export const maxDuration = 120;
+export const dynamic = "force-dynamic";
 
 const SYSTEM_PROMPT = `You are an expert software engineer with deep knowledge across the full development stack. You write clean, efficient, and well-architected code.
 
@@ -47,34 +44,74 @@ When you need current information, best practices, real-world examples, or anyth
 Prefer these tools over assumptions — the frameworks here may differ from your training data.`;
 
 export async function POST(req: Request) {
-  const {
-    messages,
-    goal,
-    sessionId,
-    model: modelId,
-    systemPrompt: customSystemPrompt,
-  }: {
-    messages: UIMessage[];
-    goal?: string;
-    sessionId?: string;
-    model?: string;
-    systemPrompt?: string;
-  } = await req.json();
+  try {
+    const {
+      messages,
+      goal,
+      sessionId: clientSessionId,
+      model: modelId,
+      systemPrompt: customSystemPrompt,
+    }: {
+      messages: UIMessage[];
+      goal?: string;
+      sessionId?: string;
+      model?: string;
+      systemPrompt?: string;
+    } = await req.json();
 
-  const baseSystem = customSystemPrompt ?? SYSTEM_PROMPT;
-  const system = goal
-    ? `${baseSystem}\n\n## Current Goal\n${goal}`
-    : baseSystem;
+    // Resolve session: use existing or create new via SDK client
+    // This ensures the sessionId is known before streaming starts
+    // so we can communicate it back to the client in response headers.
+    let activeSessionId = clientSessionId;
+    if (!activeSessionId) {
+      try {
+        const sdkClient = getOpencodeClient();
+        const sessionResult = await sdkClient.session.create({
+          title: "squid-chat session",
+        });
+        if (sessionResult.data) {
+          activeSessionId = sessionResult.data.id;
+        }
+      } catch (e) {
+        console.warn("Failed to pre-create session via SDK client, falling back to provider-managed session:", e);
+      }
+    }
 
-  const model = opencode(modelId ?? "opencode/big-pickle", {
-    ...(sessionId ? { sessionId, createNewSession: false } : { createNewSession: true }),
-  });
+    const baseSystem = customSystemPrompt ?? SYSTEM_PROMPT;
+    const system = goal
+      ? `${baseSystem}\n\n## Current Goal\n${goal}`
+      : baseSystem;
 
-  const result = streamText({
-    model,
-    system,
-    messages: await convertToModelMessages(messages),
-  });
+    const model = opencode(modelId ?? "opencode/big-pickle", {
+      sessionId: activeSessionId,
+      createNewSession: !activeSessionId,
+    });
 
-  return result.toUIMessageStreamResponse();
+    const result = streamText({
+      model,
+      system,
+      messages: await convertToModelMessages(messages),
+    });
+
+    // Build response headers including sessionId so the client
+    // can persist it for subsequent messages in the same conversation.
+    const responseHeaders: Record<string, string> = {};
+    if (activeSessionId) {
+      responseHeaders["X-Session-Id"] = activeSessionId;
+    }
+
+    return result.toUIMessageStreamResponse({
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    console.error("Chat API error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 }

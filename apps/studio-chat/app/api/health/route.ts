@@ -11,8 +11,10 @@ export async function GET() {
     }
     return NextResponse.json(data);
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.warn("Health check API exception:", message);
     return NextResponse.json(
-      { healthy: false, error: error instanceof Error ? error.message : "Unknown error" },
+      { healthy: false, error: message },
       { status: 503 }
     );
   }

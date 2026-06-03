@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOpencodeClient } from "@/app/lib/opencode-client";
+import { getOpencodeClient, getOpenCodeServerUrl } from "@/app/lib/opencode-client";
 
 export async function GET(request: Request) {
   try {
@@ -10,14 +10,14 @@ export async function GET(request: Request) {
     const client = getOpencodeClient();
     const result = await client.session.list({ limit, search });
     if (result.error) {
+      console.warn("Session list API error:", result.error);
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return NextResponse.json(result.data ?? []);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Session list API exception:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -31,13 +31,13 @@ export async function DELETE(request: Request) {
     const client = getOpencodeClient();
     const result = await client.session.delete({ sessionID });
     if (result.error) {
+      console.warn("Session delete API error:", result.error);
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Session delete API exception:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
