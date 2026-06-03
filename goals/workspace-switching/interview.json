@@ -1,0 +1,48 @@
+{
+  "stage": "interview",
+  "title": "Workspace switching edge cases and UX",
+  "goalSlug": "workspace-switching",
+  "questions": [
+    {
+      "id": "switch-confirmation",
+      "prompt": "When switching workspaces mid-conversation, should the UI prompt for confirmation before restarting the server (since the current session will end)?",
+      "description": "Switching workspaces restarts the OpenCode server, so any unsaved conversation context in the current session will be lost. Sessions from the previous workspace are preserved and available when switching back.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Yes, show a confirmation dialog: 'Switch workspace? This will end your current conversation. Your sessions for this workspace will be available when you switch back.'",
+      "recommendedOptionIds": ["confirm-yes"],
+      "options": [
+        { "id": "confirm-yes", "label": "Yes, show confirmation dialog" },
+        { "id": "confirm-no", "label": "No, just switch immediately" }
+      ],
+      "required": true
+    },
+    {
+      "id": "switch-error",
+      "prompt": "What should happen if the workspace directory no longer exists (deleted/moved after it was added)?",
+      "description": "A workspace entry's folder path may become invalid if the user deletes or renames the directory outside of squid-chat.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Show an error in the UI with options to remove the workspace entry or re-select a new path for it",
+      "recommendedOptionIds": ["error-remove-or-relink"],
+      "options": [
+        { "id": "error-remove-or-relink", "label": "Show error with 'Remove' or 'Re-link' options" },
+        { "id": "error-auto-remove", "label": "Auto-remove stale entries silently" },
+        { "id": "error-just-warn", "label": "Warn but keep the entry" }
+      ],
+      "required": true
+    },
+    {
+      "id": "reconnect-ux",
+      "prompt": "How should the UI handle the brief downtime during workspace switch (server restart)?",
+      "description": "When switching workspaces, the server restarts — this takes ~1-3 seconds. The browser tab reconnects to the new instance.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Show a 'Reconnecting…' overlay with a subtle animation; auto-reconnect when the new server is ready",
+      "recommendedOptionIds": ["reconnect-overlay"],
+      "options": [
+        { "id": "reconnect-overlay", "label": "Show 'Reconnecting…' overlay, auto-reconnect" },
+        { "id": "reconnect-toast", "label": "Show a toast notification, user clicks to reconnect" },
+        { "id": "reconnect-blank", "label": "Blank screen while reconnecting (simplest)" }
+      ],
+      "required": true
+    }
+  ]
+}

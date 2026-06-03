@@ -4,17 +4,8 @@ import { useRef, useEffect, useState, type FormEvent } from "react";
 import { useStudioChat } from "./useStudioChat";
 import { CodeBlock } from "./CodeBlock";
 import { MCPStatus } from "./MCPStatus";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { SquidChatMark } from "@/components/logo";
+import ModelSelector from "@/components/ModelSelector";
 
 const SUGGESTIONS = [
   "Explain this codebase at a high level",
@@ -349,6 +340,13 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-surface">
+            <span className="flex items-center justify-center size-7 rounded-lg bg-deep text-xs font-mono text-ink-faint shrink-0">◆</span>
+            <div>
+              <div className="text-sm font-medium text-ink">/model</div>
+              <div className="text-xs text-ink-dim mt-0.5">Open the model selector to switch between AI models.</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-surface">
             <span className="flex items-center justify-center size-7 rounded-lg bg-deep text-xs font-mono text-ink-faint shrink-0">⌘K</span>
             <div>
               <div className="text-sm font-medium text-ink">Cmd+K</div>
@@ -608,6 +606,7 @@ function SettingsPanel({
   onClose,
   model,
   onModelChange,
+  onOpenModelSelector,
   systemPrompt,
   onSystemPromptChange,
   theme,
@@ -616,6 +615,7 @@ function SettingsPanel({
   onClose: () => void;
   model: string;
   onModelChange: (m: string) => void;
+  onOpenModelSelector: () => void;
   systemPrompt: string | null;
   onSystemPromptChange: (p: string | null) => void;
   theme: "light" | "dark";
@@ -645,85 +645,20 @@ function SettingsPanel({
         <div className="space-y-5">
           <div>
             <label className="block text-[13px] font-medium text-ink mb-1.5">Model</label>
-            <Select value={model} onValueChange={onModelChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Default</SelectLabel>
-                  <SelectItem value="opencode/big-pickle">Big Pickle</SelectItem>
-                </SelectGroup>
-
-                <SelectSeparator />
-
-                <SelectGroup>
-                  <SelectLabel>Zen Models</SelectLabel>
-                  <SelectItem value="opencode/claude-sonnet-4">Claude Sonnet 4</SelectItem>
-                  <SelectItem value="opencode/claude-sonnet-4-5">Claude Sonnet 4.5</SelectItem>
-                  <SelectItem value="opencode/claude-sonnet-4-6">Claude Sonnet 4.6</SelectItem>
-                  <SelectItem value="opencode/claude-haiku-4-5">Claude Haiku 4.5</SelectItem>
-                  <SelectItem value="opencode/claude-opus-4-1">Claude Opus 4.1</SelectItem>
-                  <SelectItem value="opencode/claude-opus-4-5">Claude Opus 4.5</SelectItem>
-                  <SelectItem value="opencode/claude-opus-4-6">Claude Opus 4.6</SelectItem>
-                  <SelectItem value="opencode/claude-opus-4-7">Claude Opus 4.7</SelectItem>
-                  <SelectItem value="opencode/claude-opus-4-8">Claude Opus 4.8</SelectItem>
-                  <SelectItem value="opencode/deepseek-v4-flash">DeepSeek V4 Flash</SelectItem>
-                  <SelectItem value="opencode/deepseek-v4-flash-free">DeepSeek V4 Flash Free</SelectItem>
-                  <SelectItem value="opencode/gemini-3-flash">Gemini 3 Flash</SelectItem>
-                  <SelectItem value="opencode/gemini-3.1-pro">Gemini 3.1 Pro</SelectItem>
-                  <SelectItem value="opencode/gemini-3.5-flash">Gemini 3.5 Flash</SelectItem>
-                  <SelectItem value="opencode/glm-5">GLM-5</SelectItem>
-                  <SelectItem value="opencode/glm-5.1">GLM-5.1</SelectItem>
-                  <SelectItem value="opencode/gpt-5">GPT-5</SelectItem>
-                  <SelectItem value="opencode/gpt-5-codex">GPT-5 Codex</SelectItem>
-                  <SelectItem value="opencode/gpt-5-nano">GPT-5 Nano</SelectItem>
-                  <SelectItem value="opencode/gpt-5.1">GPT-5.1</SelectItem>
-                  <SelectItem value="opencode/gpt-5.1-codex">GPT-5.1 Codex</SelectItem>
-                  <SelectItem value="opencode/gpt-5.1-codex-max">GPT-5.1 Codex Max</SelectItem>
-                  <SelectItem value="opencode/gpt-5.1-codex-mini">GPT-5.1 Codex Mini</SelectItem>
-                  <SelectItem value="opencode/gpt-5.2">GPT-5.2</SelectItem>
-                  <SelectItem value="opencode/gpt-5.2-codex">GPT-5.2 Codex</SelectItem>
-                  <SelectItem value="opencode/gpt-5.3-codex">GPT-5.3 Codex</SelectItem>
-                  <SelectItem value="opencode/gpt-5.3-codex-spark">GPT-5.3 Codex Spark</SelectItem>
-                  <SelectItem value="opencode/gpt-5.4">GPT-5.4</SelectItem>
-                  <SelectItem value="opencode/gpt-5.4-mini">GPT-5.4 Mini</SelectItem>
-                  <SelectItem value="opencode/gpt-5.4-nano">GPT-5.4 Nano</SelectItem>
-                  <SelectItem value="opencode/gpt-5.4-pro">GPT-5.4 Pro</SelectItem>
-                  <SelectItem value="opencode/gpt-5.5">GPT-5.5</SelectItem>
-                  <SelectItem value="opencode/gpt-5.5-pro">GPT-5.5 Pro</SelectItem>
-                  <SelectItem value="opencode/grok-build-0.1">Grok Build 0.1</SelectItem>
-                  <SelectItem value="opencode/kimi-k2.5">Kimi K2.5</SelectItem>
-                  <SelectItem value="opencode/kimi-k2.6">Kimi K2.6</SelectItem>
-                  <SelectItem value="opencode/mimo-v2.5-free">MiMo V2.5 Free</SelectItem>
-                  <SelectItem value="opencode/minimax-m2.5">MiniMax M2.5</SelectItem>
-                  <SelectItem value="opencode/minimax-m2.7">MiniMax M2.7</SelectItem>
-                  <SelectItem value="opencode/minimax-m3-free">MiniMax M3 Free</SelectItem>
-                  <SelectItem value="opencode/nemotron-3-super-free">Nemotron 3 Super Free</SelectItem>
-                  <SelectItem value="opencode/qwen3.5-plus">Qwen 3.5 Plus</SelectItem>
-                  <SelectItem value="opencode/qwen3.6-plus">Qwen 3.6 Plus</SelectItem>
-                </SelectGroup>
-
-                <SelectSeparator />
-
-                <SelectGroup>
-                  <SelectLabel>Go Models</SelectLabel>
-                  <SelectItem value="opencode-go/deepseek-v4-flash">DeepSeek V4 Flash (Go)</SelectItem>
-                  <SelectItem value="opencode-go/deepseek-v4-pro">DeepSeek V4 Pro (Go)</SelectItem>
-                  <SelectItem value="opencode-go/glm-5">GLM-5 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/glm-5.1">GLM-5.1 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/kimi-k2.5">Kimi K2.5 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/kimi-k2.6">Kimi K2.6 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/mimo-v2.5">MiMo V2.5 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/mimo-v2.5-pro">MiMo V2.5 Pro (Go)</SelectItem>
-                  <SelectItem value="opencode-go/minimax-m2.5">MiniMax M2.5 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/minimax-m2.7">MiniMax M2.7 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/minimax-m3">MiniMax M3 (Go)</SelectItem>
-                  <SelectItem value="opencode-go/qwen3.6-plus">Qwen 3.6 Plus (Go)</SelectItem>
-                  <SelectItem value="opencode-go/qwen3.7-max">Qwen 3.7 Max (Go)</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <button
+              onClick={onOpenModelSelector}
+              className="w-full flex items-center justify-between rounded-xl border border-edge bg-surface px-3.5 py-2.5 text-left transition-all duration-200 hover:border-accent/30 hover:bg-accent/[0.02] group"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="size-1.5 rounded-full bg-accent shrink-0" />
+                <span className="text-sm font-medium text-ink truncate">
+                  {model.split("/").pop() || "big-pickle"}
+                </span>
+              </div>
+              <span className="text-[11px] font-medium text-ink-faint group-hover:text-ink-dim transition-colors shrink-0 ml-2">
+                Change
+              </span>
+            </button>
           </div>
 
           <div>
@@ -815,6 +750,7 @@ export default function Chat() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
   const [commandFilter, setCommandFilter] = useState("");
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -911,6 +847,7 @@ export default function Chat() {
     { id: "help", label: "/help", description: "Show available commands and usage", icon: "?" },
     { id: "clear", label: "/clear", description: "Clear the conversation and goal", icon: "⌫" },
     { id: "goal", label: "/goal <objective>", description: "Set a goal for the AI to follow", icon: "◎" },
+    { id: "model", label: "/model", description: "Switch the active AI model", icon: "◆" },
   ];
 
   const filteredCommands = COMMANDS.filter((c) =>
@@ -922,7 +859,7 @@ export default function Chat() {
     if (!input.trim() && attachedFiles.length === 0) return;
     if (showCommands && filteredCommands.length > 0) {
       const cmd = filteredCommands[selectedCommandIndex];
-      if (cmd.id === "clear" || cmd.id === "help") {
+      if (cmd.id === "clear" || cmd.id === "help" || cmd.id === "model") {
         executeCommand(cmd);
       } else {
         insertCommandText(cmd);
@@ -950,6 +887,9 @@ export default function Chat() {
         break;
       case "help":
         setShowHelp(true);
+        break;
+      case "model":
+        setShowModelSelector(true);
         break;
       case "goal": {
         const goalText = input.replace(/^\/goal\s*/i, "").trim();
@@ -1290,7 +1230,7 @@ export default function Chat() {
                           : "text-ink-dim hover:bg-surface"
                       }`}
                       onClick={() => {
-                        if (cmd.id === "clear" || cmd.id === "help") {
+      if (cmd.id === "clear" || cmd.id === "help" || cmd.id === "model") {
                           executeCommand(cmd);
                         } else {
                           insertCommandText(cmd);
@@ -1381,10 +1321,22 @@ export default function Chat() {
           onClose={() => setShowSettings(false)}
           model={model}
           onModelChange={setModel}
+          onOpenModelSelector={() => {
+            setShowSettings(false);
+            setShowModelSelector(true);
+          }}
           systemPrompt={systemPrompt}
           onSystemPromptChange={setSystemPrompt}
           theme={theme}
           onThemeChange={setTheme}
+        />
+      )}
+
+      {showModelSelector && (
+        <ModelSelector
+          model={model}
+          onModelChange={setModel}
+          onClose={() => setShowModelSelector(false)}
         />
       )}
 
