@@ -31,32 +31,21 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   const opencodeHost = config.opencodeHostname;
   const opencodePort = config.opencodePort;
 
-  // Check if an existing instance is running — if so, either reuse or replace
+  // ── Fast path: if the SAME squid-chat is already running in this directory, just reopen ──
   const existing = loadState();
-  if (existing && isProcessAlive(existing.pid)) {
-    if (existing.cwd && existing.cwd !== serverCwd) {
-      // Existing instance is in a different directory — kill it and start fresh
-      console.log(`\nExisting squid-chat is running in a different directory:`);
-      console.log(`  Old: ${existing.cwd}`);
-      console.log(`  New: ${serverCwd}`);
-      console.log("  Stopping old instance...");
-      try {
-        process.kill(existing.pid, "SIGTERM");
-      } catch { /* already gone */ }
-      // Wait for the OpenCode port to be released before proceeding
-      await waitForPortFree(opencodePort, opencodeHost, 8000);
-    } else {
-      // Same directory (or existing.cwd missing on older state) — just reopen
-      console.log(`\u2713 squid-chat already running at ${existing.url}`);
-      try {
-        execSync(`open "${existing.url}"`, { stdio: "ignore" });
-      } catch {}
-      return;
-    }
+  if (existing && isProcessAlive(existing.pid) && existing.cwd === serverCwd) {
+    console.log(`\u2713 squid-chat already running at ${existing.url}`);
+    try {
+      execSync(`open "${existing.url}"`, { stdio: "ignore" });
+    } catch {}
+    return;
   }
 
+  // ── Normal path: always start fresh ──────────────────────────────────────
+  // 1. Clear stale state
   clearState();
 
+  // 2. Verify the manifest
   const manifest = new ManifestManager();
   if (!manifest.isInstalled()) {
     console.log("squid-chat is not installed. Run `squid-chat install` first.");
@@ -65,56 +54,49 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
 
   const opencodeUrl = `http://${opencodeHost}:${opencodePort}`;
 
-  // Check if OpenCode port is available
-  const portAvailable = await new Promise<boolean>((resolve) => {
-    const server = createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => {
-      server.close(() => resolve(true));
-    });
-    server.listen(opencodePort, opencodeHost);
-  });
-
-  let opencodeServer: { url: string; close: () => void } | null = null;
-  let opencodeAbortController: AbortController | undefined;
-
-  if (portAvailable) {
-    if (!existsSync(OPENCODE_BIN)) {
-      console.log("  Downloading OpenCode binary...");
-      await ensureOpencodeBinary();
-    } else {
-      // Verify binary is executable
-      try {
-        accessSync(OPENCODE_BIN, constants.X_OK);
-      } catch {
-        console.log("  OpenCode binary not executable, re-downloading...");
-        await ensureOpencodeBinary({ forceUpgrade: true });
-      }
-    }
-
-    // Switch to the target working directory before launching OpenCode
-    // The SDK's createOpencodeServer spawns 'opencode serve' which inherits
-    // this process's CWD, so we must chdir for it to pick up the right project
-    try {
-      process.chdir(serverCwd);
-    } catch (err) {
-      console.error(`  Failed to change to directory: ${serverCwd}`, err instanceof Error ? err.message : err);
-      process.exit(1);
-    }
-
-    opencodeAbortController = new AbortController();
-
-    console.log("  Starting OpenCode server...");
-    opencodeServer = await createOpencodeServer({
-      hostname: opencodeHost,
-      port: opencodePort,
-      signal: opencodeAbortController.signal,
-    });
-  } else {
-    console.log("  Using existing OpenCode server...");
+  // 3. Ensure the OpenCode port is free.
+  //    Any existing process on this port is orphaned or serving a different
+  //    project — kill it so we can start with a clean server in the right dir.
+  if (!(await checkPortFree(opencodePort, opencodeHost))) {
+    console.log("  Clearing previous OpenCode server...");
+    await killProcessOnPort(opencodePort);
+    await waitForPortFree(opencodePort, opencodeHost, 8000);
   }
 
-  const activeOpencodeUrl = opencodeServer?.url ?? opencodeUrl;
+  // 4. Verify / download the binary
+  if (!existsSync(OPENCODE_BIN)) {
+    console.log("  Downloading OpenCode binary...");
+    await ensureOpencodeBinary();
+  } else {
+    try {
+      accessSync(OPENCODE_BIN, constants.X_OK);
+    } catch {
+      console.log("  OpenCode binary not executable, re-downloading...");
+      await ensureOpencodeBinary({ forceUpgrade: true });
+    }
+  }
+
+  // 5. Switch to the target working directory before launching OpenCode.
+  //    The SDK's createOpencodeServer spawns 'opencode serve' which inherits
+  //    this process's CWD, so we must chdir for it to pick up the right project.
+  try {
+    process.chdir(serverCwd);
+  } catch (err) {
+    console.error(`  Failed to change to directory: ${serverCwd}`, err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+
+  // 6. Start a fresh OpenCode server
+  const opencodeAbortController = new AbortController();
+
+  console.log("  Starting OpenCode server...");
+  const opencodeServer = await createOpencodeServer({
+    hostname: opencodeHost,
+    port: opencodePort,
+    signal: opencodeAbortController.signal,
+  });
+
+  const activeOpencodeUrl = opencodeServer.url;
 
   console.log("  Starting UI server...");
   const uiDir = UI_DIR;
@@ -126,7 +108,7 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   const healthy = await healthCheck(uiUrl, activeOpencodeUrl);
   if (!healthy) {
     console.error("  Health check failed");
-    opencodeServer?.close();
+    opencodeServer.close();
     serverProcess?.kill();
     process.exit(1);
   }
@@ -170,8 +152,8 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
-    opencodeAbortController?.abort();
-    opencodeServer?.close();
+    opencodeAbortController.abort();
+    opencodeServer.close();
     serverProcess?.kill();
     clearState();
   }
@@ -303,4 +285,45 @@ async function waitForPortFree(port: number, host: string, timeout: number): Pro
   }
   // Timeout — log a warning and proceed anyway; the port check later will catch it
   console.warn(`  Warning: port ${port} did not become free within ${timeout}ms, proceeding anyway`);
+}
+
+/**
+ * Check whether a TCP port is free (not in use).
+ */
+async function checkPortFree(port: number, host: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, host);
+  });
+}
+
+/**
+ * Find the process(es) listening on a TCP port and kill them with SIGTERM.
+ * Uses `lsof` which is available on macOS and Linux.
+ */
+async function killProcessOnPort(port: number): Promise<void> {
+  try {
+    const pids = execSync(`lsof -ti :${port} 2>/dev/null`, {
+      encoding: "utf-8",
+      timeout: 5000,
+    })
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map(Number);
+
+    for (const pid of pids) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+        // Already gone — ignore
+      }
+    }
+  } catch {
+    // lsof failed or no process found — nothing to kill
+  }
 }
