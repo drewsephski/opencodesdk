@@ -11,7 +11,7 @@ import { WorkspacePicker } from "./WorkspacePicker";
 
 const SUGGESTIONS = [
   "Explain this codebase at a high level",
-  "Summarize the architecture and key patterns",
+  "Summarize the projects key patterns",
   "Help me set up this project for development",
   "What should I know before contributing here?",
 ];
