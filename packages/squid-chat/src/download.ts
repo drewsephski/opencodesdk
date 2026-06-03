@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { createWriteStream, existsSync, mkdirSync, chmodSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, chmodSync, readFileSync, writeFileSync } from "fs";
 import { execSync } from "child_process";
 import { dirname } from "path";
 import { BIN_DIR, OPENCODE_BIN, UI_DIR, getPlatformTarget } from "./paths.js";
@@ -51,26 +51,25 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
   const res = await fetch(asset.browser_download_url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
   const total = parseInt(res.headers.get("content-length") ?? "0", 10);
+  const chunks: Buffer[] = [];
   const reader = res.body!.getReader();
-  const writer = createWriteStream(tmpDest);
   let downloaded = 0;
   let lastProgress = "";
 
-  const pump = async () => {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      writer.write(value);
-      downloaded += value.length;
-      if (total > 0) {
-        const pct = Math.round((downloaded / total) * 100);
-        const msg = `    [${pct}%] ${formatBytes(downloaded)} / ${formatBytes(total)}\r`;
-        if (msg !== lastProgress) { lastProgress = msg; process.stderr.write(msg); }
-      }
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(Buffer.from(value));
+    downloaded += value.length;
+    if (total > 0) {
+      const pct = Math.round((downloaded / total) * 100);
+      const msg = `    [${pct}%] ${formatBytes(downloaded)} / ${formatBytes(total)}\r`;
+      if (msg !== lastProgress) { lastProgress = msg; process.stderr.write(msg); }
     }
-    writer.close();
-  };
-  await pump();
+  }
+
+  writeFileSync(tmpDest, Buffer.concat(chunks));
+  process.stderr.write("\n");
 
   execSync(`gunzip -c "${tmpDest}" | tar -xf - -C "${BIN_DIR}"`, { stdio: "ignore" });
   if (!existsSync(OPENCODE_BIN)) throw new Error("Extraction succeeded but opencode binary not found");
@@ -106,26 +105,25 @@ export async function ensureUIBundle(options?: DownloadOptions): Promise<string>
   const res = await fetch(asset.browser_download_url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
   const total = parseInt(res.headers.get("content-length") ?? "0", 10);
+  const chunks: Buffer[] = [];
   const reader = res.body!.getReader();
-  const writer = createWriteStream(tmpDest);
   let downloaded = 0;
   let lastProgress = "";
 
-  const pump = async () => {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      writer.write(value);
-      downloaded += value.length;
-      if (total > 0) {
-        const pct = Math.round((downloaded / total) * 100);
-        const msg = `    [${pct}%] ${formatBytes(downloaded)} / ${formatBytes(total)}\r`;
-        if (msg !== lastProgress) { lastProgress = msg; process.stderr.write(msg); }
-      }
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(Buffer.from(value));
+    downloaded += value.length;
+    if (total > 0) {
+      const pct = Math.round((downloaded / total) * 100);
+      const msg = `    [${pct}%] ${formatBytes(downloaded)} / ${formatBytes(total)}\r`;
+      if (msg !== lastProgress) { lastProgress = msg; process.stderr.write(msg); }
     }
-    writer.close();
-  };
-  await pump();
+  }
+
+  writeFileSync(tmpDest, Buffer.concat(chunks));
+  process.stderr.write("\n");
 
   if (checksumAsset) {
     const checksumRes = await fetch(checksumAsset.browser_download_url, { headers: { "User-Agent": UA } });
