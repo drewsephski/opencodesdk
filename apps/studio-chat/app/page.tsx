@@ -17,10 +17,10 @@ import {
 import { SquidChatMark } from "@/components/logo";
 
 const SUGGESTIONS = [
-  "What does this directory contain?",
-  "What programming languages are used in this project?",
-  "What are the main components of this project?",
-  "Give me 5 tips for improving this codebase",
+  "Explain this codebase at a high level",
+  "Summarize the architecture and key patterns",
+  "Help me set up this project for development",
+  "What should I know before contributing here?",
 ];
 
 function PersonIcon({ size = 20 }: { size?: number }) {
@@ -71,20 +71,25 @@ function ThoughtIcon() {
   );
 }
 
-function HistoryIcon() {
+function SidebarIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="size-4">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.5} />
-      <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth={1.5} />
+      <path d="M9 3v18" stroke="currentColor" strokeWidth={1.5} />
+      <path d="M12 8l2 2-2 2" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function SettingsIcon() {
+function ModelSelectIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="size-4">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth={1.5} />
-      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" strokeWidth={1.5} />
+      <path d="M3 9h18" stroke="currentColor" strokeWidth={1.5} />
+      <circle cx="7" cy="13" r="1.5" fill="currentColor" />
+      <circle cx="12" cy="13" r="1.5" fill="currentColor" />
+      <circle cx="17" cy="13" r="1.5" fill="currentColor" />
+      <path d="M9 17l2 2 4-4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -1107,7 +1112,7 @@ export default function Chat() {
             className="hidden sm:flex items-center gap-1.5 text-[11px] text-ink-faint font-mono px-2.5 py-1 rounded-md bg-deep border border-edge-soft hover:text-ink hover:border-edge transition-all"
             title="Session History"
           >
-            <HistoryIcon />
+            <SidebarIcon />
             {sessionList.length > 0 && <span>{sessionList.length}</span>}
           </button>
           <button
@@ -1115,7 +1120,7 @@ export default function Chat() {
             className="hidden sm:flex items-center gap-1.5 text-[11px] text-ink-faint font-mono px-2.5 py-1 rounded-md bg-deep border border-edge-soft hover:text-ink hover:border-edge transition-all"
             title="Settings"
           >
-            <SettingsIcon />
+            <ModelSelectIcon />
           </button>
           {messages.length > 0 && !isStreaming && (
             <span className="hidden sm:inline-flex items-center text-[11px] text-ink-faint font-mono px-2.5 py-1 rounded-md bg-deep border border-edge-soft">
