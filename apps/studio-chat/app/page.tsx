@@ -7,7 +7,10 @@ import { MCPStatus } from "./MCPStatus";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -642,12 +645,78 @@ function SettingsPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="opencode/big-pickle">Big Pickle</SelectItem>
-                <SelectItem value="opencode/deepseek-v4-flash-free">DeepSeek V4 Flash Free</SelectItem>
-                <SelectItem value="opencode/mimo-v2.5-free">MiMo-V2.5 Free</SelectItem>
-                <SelectItem value="opencode/qwen3.6-plus-free">Qwen3.6 Plus Free</SelectItem>
-                <SelectItem value="opencode/minimax-m3-free">MiniMax M3 Free</SelectItem>
-                <SelectItem value="opencode/nemotron-3-super-free">Nemotron 3 Super Free</SelectItem>
+                <SelectGroup>
+                  <SelectLabel>Default</SelectLabel>
+                  <SelectItem value="opencode/big-pickle">Big Pickle</SelectItem>
+                </SelectGroup>
+
+                <SelectSeparator />
+
+                <SelectGroup>
+                  <SelectLabel>Zen Models</SelectLabel>
+                  <SelectItem value="opencode/claude-sonnet-4">Claude Sonnet 4</SelectItem>
+                  <SelectItem value="opencode/claude-sonnet-4-5">Claude Sonnet 4.5</SelectItem>
+                  <SelectItem value="opencode/claude-sonnet-4-6">Claude Sonnet 4.6</SelectItem>
+                  <SelectItem value="opencode/claude-haiku-4-5">Claude Haiku 4.5</SelectItem>
+                  <SelectItem value="opencode/claude-opus-4-1">Claude Opus 4.1</SelectItem>
+                  <SelectItem value="opencode/claude-opus-4-5">Claude Opus 4.5</SelectItem>
+                  <SelectItem value="opencode/claude-opus-4-6">Claude Opus 4.6</SelectItem>
+                  <SelectItem value="opencode/claude-opus-4-7">Claude Opus 4.7</SelectItem>
+                  <SelectItem value="opencode/claude-opus-4-8">Claude Opus 4.8</SelectItem>
+                  <SelectItem value="opencode/deepseek-v4-flash">DeepSeek V4 Flash</SelectItem>
+                  <SelectItem value="opencode/deepseek-v4-flash-free">DeepSeek V4 Flash Free</SelectItem>
+                  <SelectItem value="opencode/gemini-3-flash">Gemini 3 Flash</SelectItem>
+                  <SelectItem value="opencode/gemini-3.1-pro">Gemini 3.1 Pro</SelectItem>
+                  <SelectItem value="opencode/gemini-3.5-flash">Gemini 3.5 Flash</SelectItem>
+                  <SelectItem value="opencode/glm-5">GLM-5</SelectItem>
+                  <SelectItem value="opencode/glm-5.1">GLM-5.1</SelectItem>
+                  <SelectItem value="opencode/gpt-5">GPT-5</SelectItem>
+                  <SelectItem value="opencode/gpt-5-codex">GPT-5 Codex</SelectItem>
+                  <SelectItem value="opencode/gpt-5-nano">GPT-5 Nano</SelectItem>
+                  <SelectItem value="opencode/gpt-5.1">GPT-5.1</SelectItem>
+                  <SelectItem value="opencode/gpt-5.1-codex">GPT-5.1 Codex</SelectItem>
+                  <SelectItem value="opencode/gpt-5.1-codex-max">GPT-5.1 Codex Max</SelectItem>
+                  <SelectItem value="opencode/gpt-5.1-codex-mini">GPT-5.1 Codex Mini</SelectItem>
+                  <SelectItem value="opencode/gpt-5.2">GPT-5.2</SelectItem>
+                  <SelectItem value="opencode/gpt-5.2-codex">GPT-5.2 Codex</SelectItem>
+                  <SelectItem value="opencode/gpt-5.3-codex">GPT-5.3 Codex</SelectItem>
+                  <SelectItem value="opencode/gpt-5.3-codex-spark">GPT-5.3 Codex Spark</SelectItem>
+                  <SelectItem value="opencode/gpt-5.4">GPT-5.4</SelectItem>
+                  <SelectItem value="opencode/gpt-5.4-mini">GPT-5.4 Mini</SelectItem>
+                  <SelectItem value="opencode/gpt-5.4-nano">GPT-5.4 Nano</SelectItem>
+                  <SelectItem value="opencode/gpt-5.4-pro">GPT-5.4 Pro</SelectItem>
+                  <SelectItem value="opencode/gpt-5.5">GPT-5.5</SelectItem>
+                  <SelectItem value="opencode/gpt-5.5-pro">GPT-5.5 Pro</SelectItem>
+                  <SelectItem value="opencode/grok-build-0.1">Grok Build 0.1</SelectItem>
+                  <SelectItem value="opencode/kimi-k2.5">Kimi K2.5</SelectItem>
+                  <SelectItem value="opencode/kimi-k2.6">Kimi K2.6</SelectItem>
+                  <SelectItem value="opencode/mimo-v2.5-free">MiMo V2.5 Free</SelectItem>
+                  <SelectItem value="opencode/minimax-m2.5">MiniMax M2.5</SelectItem>
+                  <SelectItem value="opencode/minimax-m2.7">MiniMax M2.7</SelectItem>
+                  <SelectItem value="opencode/minimax-m3-free">MiniMax M3 Free</SelectItem>
+                  <SelectItem value="opencode/nemotron-3-super-free">Nemotron 3 Super Free</SelectItem>
+                  <SelectItem value="opencode/qwen3.5-plus">Qwen 3.5 Plus</SelectItem>
+                  <SelectItem value="opencode/qwen3.6-plus">Qwen 3.6 Plus</SelectItem>
+                </SelectGroup>
+
+                <SelectSeparator />
+
+                <SelectGroup>
+                  <SelectLabel>Go Models</SelectLabel>
+                  <SelectItem value="opencode-go/deepseek-v4-flash">DeepSeek V4 Flash (Go)</SelectItem>
+                  <SelectItem value="opencode-go/deepseek-v4-pro">DeepSeek V4 Pro (Go)</SelectItem>
+                  <SelectItem value="opencode-go/glm-5">GLM-5 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/glm-5.1">GLM-5.1 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/kimi-k2.5">Kimi K2.5 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/kimi-k2.6">Kimi K2.6 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/mimo-v2.5">MiMo V2.5 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/mimo-v2.5-pro">MiMo V2.5 Pro (Go)</SelectItem>
+                  <SelectItem value="opencode-go/minimax-m2.5">MiniMax M2.5 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/minimax-m2.7">MiniMax M2.7 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/minimax-m3">MiniMax M3 (Go)</SelectItem>
+                  <SelectItem value="opencode-go/qwen3.6-plus">Qwen 3.6 Plus (Go)</SelectItem>
+                  <SelectItem value="opencode-go/qwen3.7-max">Qwen 3.7 Max (Go)</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
