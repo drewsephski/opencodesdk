@@ -219,7 +219,7 @@ function ToolCallCard({
   part,
   status: cardStatus,
 }: {
-  part: { toolName?: string; toolCallId?: string; input?: string; result?: string; isError?: boolean };
+  part: { toolName?: string; toolCallId?: string; input?: string | unknown; result?: string | unknown; isError?: boolean };
   status: "pending" | "running" | "completed" | "error";
 }) {
   const [inputOpen, setInputOpen] = useState(false);
@@ -268,7 +268,7 @@ function ToolCallCard({
         </div>
         <span className="text-[10px] font-mono text-ink-faint">{duration}</span>
       </div>
-      {part.input && (
+      {part.input !== undefined && part.input !== null && (
         <button
           onClick={() => setInputOpen(!inputOpen)}
           className="w-full flex items-center gap-2 px-4 py-2 text-[11px] font-mono text-ink-dim hover:text-ink border-t border-edge/50 transition-colors"
@@ -277,12 +277,12 @@ function ToolCallCard({
           Input
         </button>
       )}
-      {inputOpen && part.input && (
+      {inputOpen && part.input !== undefined && part.input !== null && (
         <pre className="px-4 py-2 text-[12px] font-mono text-ink-dim/90 bg-surface/50 border-t border-edge/30 overflow-x-auto max-h-48 overflow-y-auto">
-          {part.input}
+          {typeof part.input === "string" ? part.input : JSON.stringify(part.input, null, 2)}
         </pre>
       )}
-      {part.result !== undefined && (
+      {part.result !== undefined && part.result !== null && (
         <button
           onClick={() => setOutputOpen(!outputOpen)}
           className="w-full flex items-center gap-2 px-4 py-2 text-[11px] font-mono text-ink-dim hover:text-ink border-t border-edge/50 transition-colors"
@@ -291,9 +291,9 @@ function ToolCallCard({
           {part.isError ? "Error" : "Output"}
         </button>
       )}
-      {outputOpen && part.result !== undefined && (
+      {outputOpen && part.result !== undefined && part.result !== null && (
         <pre className={`px-4 py-2 text-[12px] font-mono border-t border-edge/30 overflow-x-auto max-h-48 overflow-y-auto ${part.isError ? "text-red-500" : "text-ink-dim/90"}`}>
-          {part.result}
+          {typeof part.result === "string" ? part.result : JSON.stringify(part.result, null, 2)}
         </pre>
       )}
     </div>
@@ -999,6 +999,38 @@ export default function Chat() {
         return <MessageContent key={pi} text={p.text as string} />;
       case "reasoning":
         return <ReasoningBlock key={pi} text={p.text as string} />;
+      // AI SDK v6 dynamic tools stream as "dynamic-tool" parts
+      case "dynamic-tool": {
+        const dynP = p as {
+          toolName?: string;
+          toolCallId?: string;
+          state?: string;
+          input?: unknown;
+          output?: unknown;
+          errorText?: string;
+          preliminary?: boolean;
+        };
+        const toolStatus =
+          dynP.state === "output-error"
+            ? "error"
+            : dynP.state === "output-available" && !dynP.preliminary
+              ? "completed"
+              : "running";
+        return (
+          <ToolCallCard
+            key={pi}
+            part={{
+              toolName: dynP.toolName,
+              toolCallId: dynP.toolCallId,
+              input: dynP.input,
+              result: dynP.state === "output-error" ? dynP.errorText : dynP.output,
+              isError: dynP.state === "output-error",
+            }}
+            status={toolStatus}
+          />
+        );
+      }
+      // Legacy: loaded messages may use "tool-call" / "tool-result"
       case "tool-call":
       case "tool-result": {
         const toolStatus =
