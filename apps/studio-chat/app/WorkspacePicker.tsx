@@ -313,7 +313,7 @@ export function WorkspacePicker({
   onClose: () => void;
   workspaces: WorkspaceEntry[];
   activeWorkspace: WorkspaceEntry | null;
-  onSwitch: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; message?: string }>;
+  onSwitch: (id: string) => Promise<{ workspacePath: string; workspaceName: string; devMode?: boolean; opencodeUrl?: string; message?: string }>;
   onAdd: (path: string) => Promise<WorkspaceEntry>;
   onCreate: (name: string, parentDir?: string, template?: string) => Promise<WorkspaceEntry & { dirPath: string; message: string }>;
   onRemove: (id: string) => Promise<void>;
@@ -362,8 +362,8 @@ export function WorkspacePicker({
     setSwitchError(null);
     try {
       const result = await onSwitch(id);
-      if (result.devMode) {
-        // Dev mode — show handoff dialog instead of closing
+      if (result.devMode && !result.opencodeUrl) {
+        // Dev mode without a spawned server — show handoff dialog
         const ws = workspaces.find((w) => w.id === id);
         if (ws) setHandoffWorkspace({ name: ws.name, path: ws.path });
         return;
@@ -385,8 +385,8 @@ export function WorkspacePicker({
     const ws = await onCreate(name, parentDir, template);
     // Auto-switch to the new workspace
     const switchResult = await onSwitch(ws.id);
-    if (switchResult.devMode) {
-      // Dev mode — show handoff dialog
+    if (switchResult.devMode && !switchResult.opencodeUrl) {
+      // Dev mode without a spawned server — show handoff dialog
       setHandoffWorkspace({ name: ws.name, path: ws.dirPath || ws.path });
       setShowNewDialog(false);
       return;
