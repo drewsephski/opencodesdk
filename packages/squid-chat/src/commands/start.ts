@@ -53,11 +53,11 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
       console.log("  Downloading OpenCode binary...");
       await ensureOpencodeBinary();
     }
+    process.chdir(serverCwd);
     console.log("  Starting OpenCode server...");
     opencodeServer = await createOpencodeServer({
       hostname: opencodeHost,
       port: opencodePort,
-      cwd: serverCwd,
     });
     opencodeStarted = true;
   } else {
