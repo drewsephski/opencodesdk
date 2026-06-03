@@ -6,6 +6,7 @@ import { statusCommand } from "./commands/status.js";
 import { installCommand } from "./commands/install.js";
 import { upgradeCommand } from "./commands/upgrade.js";
 import { versionCommand } from "./commands/version.js";
+import { workspaceCommand } from "./commands/workspace.js";
 import { SQUID_CHAT_DIR } from "./paths.js";
 import { ManifestManager } from "./manifest.js";
 
@@ -56,6 +57,9 @@ async function main() {
       break;
     case "upgrade":
       await upgradeCommand();
+      break;
+    case "workspace":
+      await workspaceCommand(process.argv.slice(3));
       break;
     case "version":
     case "--version":

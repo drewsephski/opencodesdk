@@ -1,16 +1,17 @@
 import { spawn, execSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, unlinkSync } from "fs";
 import { createServer } from "net";
 import { createOpencodeServer } from "@opencode-ai/sdk";
 import { loadConfig } from "../config.js";
 import { loadState, saveState, clearState, isProcessAlive } from "../state.js";
-import { OPENCODE_BIN, UI_DIR } from "../paths.js";
+import { OPENCODE_BIN, UI_DIR, RESTART_MARKER_PATH } from "../paths.js";
 import { ensureOpencodeBinary } from "../download.js";
 import { healthCheck } from "../health.js";
 import { detectProject } from "../project.js";
 import { ManifestManager } from "../manifest.js";
+import { WorkspaceManager } from "../workspace.js";
 
-export async function startCommand(): Promise<void> {
+export async function startCommand(cwd?: string): Promise<void> {
   const config = loadConfig();
 
   const existing = loadState();
@@ -46,6 +47,9 @@ export async function startCommand(): Promise<void> {
       console.log("  Downloading OpenCode binary...");
       await ensureOpencodeBinary();
     }
+    // Switch to workspace CWD before starting the server so it detects the right project
+    const serverCwd = cwd ?? process.cwd();
+    process.chdir(serverCwd);
     console.log("  Starting OpenCode server...");
     opencodeServer = await createOpencodeServer({
       hostname: config.opencodeHostname,
@@ -72,9 +76,23 @@ export async function startCommand(): Promise<void> {
     process.exit(1);
   }
 
-  const project = await detectProject();
+  const project = await detectProject(cwd);
+  const wm = new WorkspaceManager();
   if (project) {
     console.log(`  Project detected: ${project.name} (${project.framework})`);
+    const existing = wm.findByPath(process.cwd());
+    if (!existing) {
+      wm.add({
+        path: process.cwd(),
+        name: project.name,
+        projectName: project.name,
+        framework: project.framework,
+        language: project.language,
+      });
+      console.log(`  Added workspace: ${project.name}`);
+    } else {
+      wm.touch(existing.id);
+    }
   }
 
   saveState({
@@ -88,20 +106,40 @@ export async function startCommand(): Promise<void> {
     execSync(`open "${uiUrl}"`, { stdio: "ignore" });
   } catch {}
 
-  process.on("SIGINT", () => {
-    console.log("\nShutting down...");
+  function shutdown() {
     opencodeServer?.close();
     serverProcess?.kill();
     clearState();
+  }
+
+  process.on("SIGINT", () => {
+    console.log("\nShutting down...");
+    shutdown();
     process.exit(0);
   });
 
   process.on("SIGTERM", () => {
-    opencodeServer?.close();
-    serverProcess?.kill();
-    clearState();
+    shutdown();
     process.exit(0);
   });
+
+  // Watch for restart marker — poll every 2 seconds
+  const checkInterval = setInterval(() => {
+    if (!existsSync(RESTART_MARKER_PATH)) return;
+    try {
+      const marker = JSON.parse(readFileSync(RESTART_MARKER_PATH, "utf-8"));
+      if (marker.cwd && marker.cwd !== process.cwd()) {
+        clearInterval(checkInterval);
+        console.log(`\nSwitching to workspace: ${marker.cwd}`);
+        unlinkSync(RESTART_MARKER_PATH);
+        shutdown();
+        // Start again with the new CWD — reuse same process
+        startCommand(marker.cwd);
+      }
+    } catch {
+      // Malformed or race — ignore
+    }
+  }, 2000);
 
   await new Promise(() => {});
 }
