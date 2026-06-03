@@ -1,12 +1,11 @@
 import { spawn, execSync } from "child_process";
-import { existsSync, mkdirSync, createWriteStream } from "fs";
-import { dirname } from "path";
+import { existsSync } from "fs";
+import { createServer } from "net";
 import { createOpencodeServer } from "@opencode-ai/sdk";
 import { loadConfig } from "../config.js";
 import { loadState, saveState, clearState, isProcessAlive } from "../state.js";
-import { OPENCODE_BIN, UI_DIR, BIN_DIR } from "../paths.js";
+import { OPENCODE_BIN, UI_DIR } from "../paths.js";
 import { ensureOpencodeBinary } from "../download.js";
-import { ensureUIBundle } from "../download.js";
 import { healthCheck } from "../health.js";
 import { detectProject } from "../project.js";
 import { ManifestManager } from "../manifest.js";
@@ -31,29 +30,44 @@ export async function startCommand(): Promise<void> {
     process.exit(1);
   }
 
-  if (!existsSync(OPENCODE_BIN)) {
-    console.log("  Downloading OpenCode binary...");
-    await ensureOpencodeBinary();
+  const opencodeUrl = `http://${config.opencodeHostname}:${config.opencodePort}`;
+
+  const portAvailable = await new Promise<boolean>((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => { server.close(); resolve(true); });
+    server.listen(config.opencodePort, config.opencodeHostname);
+  });
+
+  let opencodeServer: { url: string; close: () => void } | null = null;
+
+  if (portAvailable) {
+    if (!existsSync(OPENCODE_BIN)) {
+      console.log("  Downloading OpenCode binary...");
+      await ensureOpencodeBinary();
+    }
+    console.log("  Starting OpenCode server...");
+    opencodeServer = await createOpencodeServer({
+      hostname: config.opencodeHostname,
+      port: config.opencodePort,
+    });
+  } else {
+    console.log("  Using existing OpenCode server...");
   }
 
-  console.log("  Starting OpenCode server...");
-  const opencodeServer = await createOpencodeServer({
-    hostname: config.opencodeHostname,
-    port: config.opencodePort,
-  });
-  const opencodeUrl = opencodeServer.url;
+  const activeOpencodeUrl = opencodeServer?.url ?? opencodeUrl;
 
   console.log("  Starting UI server...");
   const uiDir = UI_DIR;
-  const { port: uiPort, serverProcess } = await startUIServer(uiDir, opencodeUrl);
+  const { port: uiPort, serverProcess } = await startUIServer(uiDir, activeOpencodeUrl);
 
   const uiUrl = `http://127.0.0.1:${uiPort}`;
 
   console.log("  Verifying health...");
-  const healthy = await healthCheck(uiUrl, opencodeUrl);
+  const healthy = await healthCheck(uiUrl, activeOpencodeUrl);
   if (!healthy) {
     console.error("  Health check failed");
-    opencodeServer.close();
+    opencodeServer?.close();
     serverProcess?.kill();
     process.exit(1);
   }
@@ -76,14 +90,14 @@ export async function startCommand(): Promise<void> {
 
   process.on("SIGINT", () => {
     console.log("\nShutting down...");
-    opencodeServer.close();
+    opencodeServer?.close();
     serverProcess?.kill();
     clearState();
     process.exit(0);
   });
 
   process.on("SIGTERM", () => {
-    opencodeServer.close();
+    opencodeServer?.close();
     serverProcess?.kill();
     clearState();
     process.exit(0);
