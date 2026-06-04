@@ -5,10 +5,58 @@
  * calling process mutating global state via `process.chdir()`.  This module
  * wraps `child_process.spawn` directly so the OpenCode child process always
  * starts in the exact directory we intend — no shared-state side effects.
+ *
+ * ── Binary resolution ──
+ * The SDK used `launch('opencode', ...)` which resolves the binary through the
+ * system PATH.  Several binaries may be present on a developer's machine:
+ *
+ *   PATH (via `which opencode`)   → the latest version with `serve` support
+ *   ~/.squid-chat/bin/opencode     → older CLI-only version (may lack `serve`)
+ *
+ * We resolve via PATH first (matching SDK behaviour), then fall back to the
+ * squid-chat-managed binary.
  */
 
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
+import { existsSync } from "fs";
 import { OPENCODE_BIN } from "./paths.js";
+
+// ---------------------------------------------------------------------------
+// Binary resolution (resolved once at module load)
+// ---------------------------------------------------------------------------
+
+function resolveOpencodeBinary(): string {
+  // 1. Try PATH resolution (same as SDK's launch('opencode', ...)).
+  //    Most users have the official opencode install in PATH (e.g.
+  //    ~/.opencode/bin/opencode) which includes the `serve` subcommand.
+  try {
+    const result = execSync("which opencode 2>/dev/null || command -v opencode", {
+      encoding: "utf-8",
+      timeout: 3000,
+    }).trim();
+    if (result && existsSync(result)) return result;
+  } catch {
+    // not in PATH — fall through
+  }
+
+  // 2. Fall back to the squid-chat-managed binary (~/.squid-chat/bin/opencode).
+  //    Note: this binary may be an older release that lacks the `serve`
+  //    subcommand.  The fallback exists for environments where opencode is
+  //    only available through the squid-chat download.
+  return OPENCODE_BIN;
+}
+
+const OPENCODE_BINARY = resolveOpencodeBinary();
+
+/**
+ * The resolved `opencode` binary path (PATH first, ~/.squid-chat/bin fallback).
+ * Exported so callers can verify the binary exists before spawning.
+ */
+export { OPENCODE_BINARY };
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export interface OpencodeServerOptions {
   hostname: string;
@@ -84,7 +132,7 @@ export async function startOpencodeServer(
 
   const args = [`serve`, `--hostname=${hostname}`, `--port=${port}`];
 
-  const proc = spawn(OPENCODE_BIN, args, {
+  const proc = spawn(OPENCODE_BINARY, args, {
     /** ── THE KEY FIX ── explicit working directory, no process.chdir() needed */
     cwd,
     env: {

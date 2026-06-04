@@ -2,10 +2,10 @@ import { spawn, execSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, accessSync, constants } from "fs";
 import { createServer } from "net";
 import { join, dirname } from "path";
-import { startOpencodeServer } from "../opencode-server.js";
+import { startOpencodeServer, OPENCODE_BINARY } from "../opencode-server.js";
 import { loadConfig } from "../config.js";
 import { loadState, saveState, clearState, isProcessAlive } from "../state.js";
-import { OPENCODE_BIN, UI_DIR, RESTART_MARKER_PATH, SQUID_CHAT_DIR } from "../paths.js";
+import { UI_DIR, RESTART_MARKER_PATH, SQUID_CHAT_DIR } from "../paths.js";
 import { ensureOpencodeBinary } from "../download.js";
 import { healthCheck } from "../health.js";
 import { detectProject } from "../project.js";
@@ -33,7 +33,7 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   }
 
   const opencodeHost = config.opencodeHostname;
-  const opencodePort = config.opencodePort;
+  let opencodePort = config.opencodePort;
 
   // ── Fast path: if the SAME squid-chat is already running in this directory, just reopen ──
   const existing = loadState();
@@ -61,19 +61,27 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
   // 3. Ensure the OpenCode port is free.
   //    Any existing process on this port is orphaned or serving a different
   //    project — kill it so we can start with a clean server in the right dir.
+  //    If the port can't be freed (e.g. a persistent daemon like Devin's kilo
+  //    auto-respawns), we fall back to port 0 (OS-assigned).
   if (!(await checkPortFree(opencodePort, opencodeHost))) {
     console.log("  Clearing previous OpenCode server...");
     await killProcessOnPort(opencodePort);
-    await waitForPortFree(opencodePort, opencodeHost, 8000);
+    const freed = await waitForPortFree(opencodePort, opencodeHost, 8000);
+    if (!freed) {
+      console.warn(`  Warning: port ${opencodePort} is held by a persistent process, using OS-assigned port instead.`);
+      opencodePort = 0;
+    }
   }
 
   // 4. Verify / download the binary
-  if (!existsSync(OPENCODE_BIN)) {
+  //    We check the resolved binary path (PATH first, ~/.squid-chat/bin fallback).
+  //    If neither exists, download to the managed path as a last resort.
+  if (!existsSync(OPENCODE_BINARY)) {
     console.log("  Downloading OpenCode binary...");
     await ensureOpencodeBinary();
   } else {
     try {
-      accessSync(OPENCODE_BIN, constants.X_OK);
+      accessSync(OPENCODE_BINARY, constants.X_OK);
     } catch {
       console.log("  OpenCode binary not executable, re-downloading...");
       await ensureOpencodeBinary({ forceUpgrade: true });
@@ -289,7 +297,7 @@ async function startUIServer(
  * Used when replacing an old squid-chat instance — we need to wait for its
  * OpenCode server port to be released before we can start our own.
  */
-async function waitForPortFree(port: number, host: string, timeout: number): Promise<void> {
+async function waitForPortFree(port: number, host: string, timeout: number): Promise<boolean> {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const free = await new Promise<boolean>((resolve) => {
@@ -300,11 +308,10 @@ async function waitForPortFree(port: number, host: string, timeout: number): Pro
       });
       server.listen(port, host);
     });
-    if (free) return;
+    if (free) return true;
     await new Promise((r) => setTimeout(r, 300));
   }
-  // Timeout — log a warning and proceed anyway; the port check later will catch it
-  console.warn(`  Warning: port ${port} did not become free within ${timeout}ms, proceeding anyway`);
+  return false;
 }
 
 /**
