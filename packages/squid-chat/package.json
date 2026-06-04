@@ -1,6 +1,6 @@
 {
   "name": "squid-chat",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "A beautiful chat UI for OpenCode SDK — run locally in any project",
   "license": "MIT",
   "type": "module",

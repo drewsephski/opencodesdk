@@ -2,7 +2,7 @@ import { spawn, execSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, accessSync, constants } from "fs";
 import { createServer } from "net";
 import { join, dirname } from "path";
-import { createOpencodeServer } from "@opencode-ai/sdk";
+import { startOpencodeServer } from "../opencode-server.js";
 import { loadConfig } from "../config.js";
 import { loadState, saveState, clearState, isProcessAlive } from "../state.js";
 import { OPENCODE_BIN, UI_DIR, RESTART_MARKER_PATH, SQUID_CHAT_DIR } from "../paths.js";
@@ -80,31 +80,19 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
     }
   }
 
-  // 5. Temporarily switch to the target working directory.
-  //    The SDK's createOpencodeServer spawns 'opencode serve' which inherits
-  //    this process's CWD, so we must chdir for it to pick up the right project.
-  //    We save the original CWD and restore it after the server is created to
-  //    avoid side effects on other modules.
-  const previousCwd = process.cwd();
-  try {
-    process.chdir(serverCwd);
-  } catch (err) {
-    console.error(`  Failed to change to directory: ${serverCwd}`, err instanceof Error ? err.message : err);
-    process.exit(1);
-  }
-
-  // 6. Start a fresh OpenCode server
+  // 5. Start a fresh OpenCode server in the target directory.
+  //    Unlike the SDK's createOpencodeServer (which has no `cwd` option and
+  //    relies on process.chdir()), we spawn the binary directly with an explicit
+  //    working directory.  No global state mutation needed.
   const opencodeAbortController = new AbortController();
 
   console.log("  Starting OpenCode server...");
-  const opencodeServer = await createOpencodeServer({
+  const opencodeServer = await startOpencodeServer({
     hostname: opencodeHost,
     port: opencodePort,
+    cwd: serverCwd,
     signal: opencodeAbortController.signal,
   });
-
-  // Restore original CWD — the opencode binary already inherited its own CWD
-  try { process.chdir(previousCwd); } catch {}
 
   const activeOpencodeUrl = opencodeServer.url;
 
