@@ -30,7 +30,9 @@ export function loadConfig(): Config {
       const raw = readFileSync(CONFIG_PATH, "utf-8");
       return { ...DEFAULTS, ...JSON.parse(raw) };
     }
-  } catch {}
+  } catch (e) {
+    console.warn(`Warning: corrupted config at ${CONFIG_PATH}, using defaults — ${(e as Error).message}`);
+  }
   return { ...DEFAULTS };
 }
 

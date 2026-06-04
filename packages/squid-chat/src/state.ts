@@ -16,7 +16,9 @@ export function loadState(): RuntimeState | null {
     if (existsSync(STATE_PATH)) {
       return JSON.parse(readFileSync(STATE_PATH, "utf-8"));
     }
-  } catch {}
+  } catch (e) {
+    console.warn(`Warning: corrupted state at ${STATE_PATH}, ignoring — ${(e as Error).message}`);
+  }
   return null;
 }
 

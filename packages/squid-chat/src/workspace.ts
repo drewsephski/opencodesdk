@@ -26,8 +26,8 @@ export class WorkspaceManager {
         const raw = readFileSync(WORKSPACES_PATH, "utf-8");
         this.entries = JSON.parse(raw);
       }
-    } catch {
-      // Corrupt or missing file — start fresh
+    } catch (e) {
+      console.warn(`Warning: corrupted workspaces at ${WORKSPACES_PATH}, starting fresh — ${(e as Error).message}`);
       this.entries = [];
     }
     this.loaded = true;

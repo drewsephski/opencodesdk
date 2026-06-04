@@ -1,7 +1,8 @@
 import { homedir, platform, arch } from "os";
 import { join } from "path";
 
-const BASE = join(homedir(), ".squid-chat");
+/** Override via SQUID_CHAT_DIR env var, otherwise ~/.squid-chat */
+const BASE = process.env.SQUID_CHAT_DIR ?? join(homedir(), ".squid-chat");
 
 export const SQUID_CHAT_DIR = BASE;
 export const BIN_DIR = join(BASE, "bin");

@@ -1,10 +1,23 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
 import { MANIFEST_PATH } from "./paths.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(readFileSync(`${__dirname}/../package.json`, "utf-8"));
+/**
+ * Read the CLI's own package.json to extract the current version.
+ * Uses createRequire for robust resolution across packaging tools
+ * (tsc, esbuild, ncc, pkg) instead of a fragile __dirname-relative path.
+ */
+const _require = createRequire(import.meta.url);
+let pkg: { version: string };
+try {
+  pkg = _require("../package.json");
+} catch {
+  // Fallback: if bundled/packaged, try __dirname-relative
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  pkg = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
+}
 
 interface Manifest {
   installed: boolean;
@@ -34,9 +47,12 @@ export class ManifestManager {
       } else {
         this.data = { ...DEFAULT_MANIFEST };
       }
-    } catch {
+    } catch (e) {
+      console.warn(`Warning: corrupted manifest at ${MANIFEST_PATH}, resetting — ${(e as Error).message}`);
       this.data = { ...DEFAULT_MANIFEST };
     }
+    // Always use the runtime version — don't let a stale cache override it
+    this.data.cliVersion = pkg.version;
   }
 
   isInstalled(): boolean {

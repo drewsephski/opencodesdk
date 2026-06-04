@@ -3,8 +3,15 @@ import { randomUUID } from "crypto";
 import { homedir } from "os";
 import { join, dirname, basename } from "path";
 
-const WORKSPACES_PATH = join(homedir(), ".squid-chat", "workspaces", "workspaces.json");
-const RESTART_MARKER_PATH = join(homedir(), ".squid-chat", "run", "restart.json");
+/**
+ * IMPORTANT: These paths MUST stay in sync with packages/squid-chat/src/paths.ts.
+ * If you change one, change both. The SQUID_CHAT_DIR env var is the canonical
+ * override — it takes precedence when set in any context (CLI or UI server).
+ */
+const SQUID_CHAT_DIR = process.env.SQUID_CHAT_DIR ?? join(homedir(), ".squid-chat");
+const WORKSPACES_PATH = join(SQUID_CHAT_DIR, "workspaces", "workspaces.json");
+const RESTART_MARKER_PATH = join(SQUID_CHAT_DIR, "run", "restart.json");
+const STATE_PATH = join(SQUID_CHAT_DIR, "run", "state.json");
 
 export interface WorkspaceEntry {
   id: string;
@@ -22,8 +29,8 @@ export function listWorkspaces(): WorkspaceEntry[] {
     if (existsSync(WORKSPACES_PATH)) {
       return JSON.parse(readFileSync(WORKSPACES_PATH, "utf-8"));
     }
-  } catch {
-    // Corrupt or missing
+  } catch (e) {
+    console.warn(`Warning: corrupted workspaces at ${WORKSPACES_PATH}, returning empty — ${(e as Error).message}`);
   }
   return [];
 }
@@ -151,9 +158,8 @@ export function removeWorkspaceFile(id: string): boolean {
 
 export function isSquidChatRunning(): boolean {
   try {
-    const statePath = join(homedir(), ".squid-chat", "run", "state.json");
-    if (existsSync(statePath)) {
-      const state = JSON.parse(readFileSync(statePath, "utf-8"));
+    if (existsSync(STATE_PATH)) {
+      const state = JSON.parse(readFileSync(STATE_PATH, "utf-8"));
       // Check if the process is alive (Unix signal 0)
       try {
         process.kill(state.pid, 0);
@@ -162,7 +168,9 @@ export function isSquidChatRunning(): boolean {
         return false;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn(`Warning: corrupted state at ${STATE_PATH} — ${(e as Error).message}`);
+  }
   return false;
 }
 
@@ -170,12 +178,13 @@ export function writeRestartMarker(workspaceId: string, cwd: string): void {
   // Read current state to include the UI port so the restart reuses it
   let currentUiPort: number | undefined;
   try {
-    const statePath = join(homedir(), ".squid-chat", "run", "state.json");
-    if (existsSync(statePath)) {
-      const state = JSON.parse(readFileSync(statePath, "utf-8"));
+    if (existsSync(STATE_PATH)) {
+      const state = JSON.parse(readFileSync(STATE_PATH, "utf-8"));
       currentUiPort = state.uiPort;
     }
-  } catch {}
+  } catch (e) {
+    console.warn(`Warning: could not read state for restart marker — ${(e as Error).message}`);
+  }
 
   const dir = dirname(RESTART_MARKER_PATH);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

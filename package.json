@@ -5,5 +5,9 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "squid-chat": "node packages/squid-chat/dist/cli.js",
+    "squid-chat:dev": "bun run packages/squid-chat/src/cli.ts"
+  }
 }

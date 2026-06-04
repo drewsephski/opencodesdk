@@ -1,15 +1,19 @@
 import { spawn, execSync } from "child_process";
-import { existsSync, readFileSync, unlinkSync, accessSync, constants } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, accessSync, constants } from "fs";
 import { createServer } from "net";
+import { join, dirname } from "path";
 import { createOpencodeServer } from "@opencode-ai/sdk";
 import { loadConfig } from "../config.js";
 import { loadState, saveState, clearState, isProcessAlive } from "../state.js";
-import { OPENCODE_BIN, UI_DIR, RESTART_MARKER_PATH } from "../paths.js";
+import { OPENCODE_BIN, UI_DIR, RESTART_MARKER_PATH, SQUID_CHAT_DIR } from "../paths.js";
 import { ensureOpencodeBinary } from "../download.js";
 import { healthCheck } from "../health.js";
 import { detectProject } from "../project.js";
 import { ManifestManager } from "../manifest.js";
 import { WorkspaceManager } from "../workspace.js";
+
+/** Path where the UI server writes its listening port for deterministic detection */
+const UI_PORT_FILE = join(SQUID_CHAT_DIR, "run", "ui-port.json");
 
 export async function startCommand(cwd?: string, previousUIPort?: number): Promise<void> {
   const config = loadConfig();
@@ -76,9 +80,12 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
     }
   }
 
-  // 5. Switch to the target working directory before launching OpenCode.
+  // 5. Temporarily switch to the target working directory.
   //    The SDK's createOpencodeServer spawns 'opencode serve' which inherits
   //    this process's CWD, so we must chdir for it to pick up the right project.
+  //    We save the original CWD and restore it after the server is created to
+  //    avoid side effects on other modules.
+  const previousCwd = process.cwd();
   try {
     process.chdir(serverCwd);
   } catch (err) {
@@ -95,6 +102,9 @@ export async function startCommand(cwd?: string, previousUIPort?: number): Promi
     port: opencodePort,
     signal: opencodeAbortController.signal,
   });
+
+  // Restore original CWD — the opencode binary already inherited its own CWD
+  try { process.chdir(previousCwd); } catch {}
 
   const activeOpencodeUrl = opencodeServer.url;
 
@@ -219,6 +229,18 @@ async function startUIServer(
     throw new Error(`UI not found at ${uiDir}. Run \`squid-chat install\` first.`);
   }
 
+  // First, check if a recent port file exists from a previous run
+  if (!preferredPort && existsSync(UI_PORT_FILE)) {
+    try {
+      const prev = JSON.parse(readFileSync(UI_PORT_FILE, "utf-8"));
+      if (prev.port && typeof prev.port === "number") {
+        preferredPort = prev.port;
+      }
+    } catch {
+      // Ignore stale port file
+    }
+  }
+
   const port = preferredPort ? String(preferredPort) : "0";
   const child = spawn("node", ["server.js"], {
     cwd: uiDir,
@@ -260,6 +282,16 @@ async function startUIServer(
       if (code !== 0) reject(new Error(`UI server exited with code ${code}`));
     });
   });
+
+  // Write the detected port to a known file for deterministic future lookups
+  // (instead of relying on stdout scraping during restart)
+  try {
+    const dir = dirname(UI_PORT_FILE);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(UI_PORT_FILE, JSON.stringify({ port: actualPort, startedAt: Date.now() }));
+  } catch {
+    // Non-critical — stdout scraping will still work on next restart as fallback
+  }
 
   return { port: actualPort, serverProcess: child };
 }
@@ -303,7 +335,8 @@ async function checkPortFree(port: number, host: string): Promise<boolean> {
 
 /**
  * Find the process(es) listening on a TCP port and kill them with SIGTERM.
- * Uses `lsof` which is available on macOS and Linux.
+ * Uses `lsof` on macOS/Linux where available. Falls back gracefully with a
+ * warning — the port check after this call will catch conflicts.
  */
 async function killProcessOnPort(port: number): Promise<void> {
   try {
@@ -323,7 +356,12 @@ async function killProcessOnPort(port: number): Promise<void> {
         // Already gone — ignore
       }
     }
-  } catch {
-    // lsof failed or no process found — nothing to kill
+  } catch (e) {
+    // lsof unavailable (Windows, containers, etc.) — warn and proceed
+    const err = e as Error;
+    if (err.message?.includes("lsof")) {
+      console.warn(`  Warning: lsof not available, cannot auto-clear port ${port}. If the port is in use, try killing manually.`);
+    }
+    // If lsof is available but found no process, exit code is 1 — silently ignore
   }
 }

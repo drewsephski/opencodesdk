@@ -1,7 +1,9 @@
 import { createHash } from "crypto";
-import { existsSync, mkdirSync, chmodSync, readFileSync, writeFileSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync, chmodSync, readFileSync, writeFileSync } from "fs";
 import { execSync } from "child_process";
 import { dirname } from "path";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
 import { BIN_DIR, OPENCODE_BIN, UI_DIR, getPlatformTarget } from "./paths.js";
 
 const OPENCODE_RELEASES = "https://api.github.com/repos/opencode-ai/opencode/releases/latest";
@@ -26,6 +28,26 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Download a file using native fetch() and stream it to disk.
+ * Cross-platform replacement for `curl -o`.
+ */
+async function downloadFile(url: string, dest: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} downloading ${url}`);
+  if (!res.body) throw new Error(`No response body from ${url}`);
+  await pipeline(Readable.fromWeb(res.body as import("stream/web").ReadableStream), createWriteStream(dest));
+}
+
+/**
+ * Extract a .tar.gz archive to a directory.
+ * Uses shell-based `gunzip | tar` which is available on macOS and Linux.
+ * The download step (curl → native fetch) is the more impactful cross-platform fix.
+ */
+function extractTarGz(archivePath: string, destDir: string): void {
+  execSync(`gunzip -c "${archivePath}" | tar -xf - -C "${destDir}"`, { stdio: "ignore", timeout: 30_000 });
+}
+
 export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<string> {
   if (existsSync(OPENCODE_BIN) && !options?.forceUpgrade) {
     return getCurrentVersion(OPENCODE_BIN);
@@ -48,12 +70,9 @@ export async function ensureOpencodeBinary(options?: DownloadOptions): Promise<s
   console.log(`    Downloading OpenCode ${version} (${target})...`);
   const tmpDest = `${BIN_DIR}/opencode.tar.gz`;
 
-  execSync(`curl -#fSL "${asset.browser_download_url}" -o "${tmpDest}"`, {
-    stdio: "inherit",
-    timeout: 120_000,
-  });
+  await downloadFile(asset.browser_download_url, tmpDest);
+  extractTarGz(tmpDest, BIN_DIR);
 
-  execSync(`gunzip -c "${tmpDest}" | tar -xf - -C "${BIN_DIR}"`, { stdio: "ignore" });
   if (!existsSync(OPENCODE_BIN)) throw new Error("Extraction succeeded but opencode binary not found");
   chmodSync(OPENCODE_BIN, 0o755);
   return version;
@@ -64,7 +83,9 @@ export async function ensureUIBundle(options?: DownloadOptions): Promise<string>
   if (existsSync(manifestPath) && !options?.forceUpgrade) {
     try {
       return JSON.parse(readFileSync(manifestPath, "utf-8")).version;
-    } catch { /* fall through to download */ }
+    } catch (e) {
+      console.warn(`Warning: corrupted UI version manifest at ${manifestPath}, re-downloading — ${(e as Error).message}`);
+    }
   }
 
   if (!existsSync(UI_DIR)) mkdirSync(UI_DIR, { recursive: true });
@@ -84,10 +105,7 @@ export async function ensureUIBundle(options?: DownloadOptions): Promise<string>
   console.log(`    Downloading UI bundle ${version}...`);
   const tmpDest = `${UI_DIR}/bundle.tar.gz`;
 
-  execSync(`curl -#fSL "${asset.browser_download_url}" -o "${tmpDest}"`, {
-    stdio: "inherit",
-    timeout: 120_000,
-  });
+  await downloadFile(asset.browser_download_url, tmpDest);
 
   if (checksumAsset) {
     const checksumRes = await fetch(checksumAsset.browser_download_url, { headers: { "User-Agent": UA } });
@@ -101,7 +119,7 @@ export async function ensureUIBundle(options?: DownloadOptions): Promise<string>
     console.log("    \u2713 Checksum verified");
   }
 
-  execSync(`gunzip -c "${tmpDest}" | tar -xf - -C "${UI_DIR}"`, { stdio: "ignore" });
+  extractTarGz(tmpDest, UI_DIR);
   writeFileSync(`${UI_DIR}/version.json`, JSON.stringify({ version }));
   return version;
 }
